@@ -2,6 +2,9 @@
 
 > Cross-standard vector DB migration tool. Export, import, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
+
+<img width="1086" height="519" alt="image" src="https://github.com/user-attachments/assets/4d847c0c-eced-40d5-8013-f1480475931f" />
+
 ```bash
 npx @vektormemory/vex export --from vektor --db slipstream-memory.db --output memories.vmig.jsonl
 npx @vektormemory/vex import --from memories.vmig.jsonl --to pinecone --api-key $KEY --index my-index --host $HOST
@@ -28,6 +31,9 @@ Every vector DB has a different API, a different format, and zero interop. Movin
 | `pgvector` | ✅ | ✅ | Stable — schema introspection, extractStream |
 | `vektor`   | ✅ | ✅ | Stable — sqlite-vec ANN optional |
 
+
+
+<img width="1189" height="422" alt="image" src="https://github.com/user-attachments/assets/cf1473e1-d4a3-4283-8064-32bf79df6067" />
 
 ## Install
 
