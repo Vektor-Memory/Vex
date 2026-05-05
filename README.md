@@ -1,4 +1,4 @@
-# vex — Vector Exchange
+# Vex — Vector Exchange
 
 > Cross-standard vector DB migration tool. Export, import, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
