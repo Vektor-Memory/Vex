@@ -1,7 +1,24 @@
-import Database       from 'better-sqlite3';
 import { createRequire } from 'module';
 import { toRecord }   from '../formats/vmig.js';
 import { progress, summary } from '../utils/progress.js';
+
+// ── Lazy loader — avoids crashing on startup if better-sqlite3 isn't built ──
+
+let _Database = null;
+async function getDatabase() {
+  if (_Database) return _Database;
+  try {
+    const mod  = await import('better-sqlite3');
+    _Database  = mod.default;
+    return _Database;
+  } catch {
+    throw new Error(
+      'better-sqlite3 is required for the vektor connector.\n' +
+      '  Install: npm install better-sqlite3\n' +
+      '  Node 24+: npm install better-sqlite3 --build-from-source'
+    );
+  }
+}
 
 // ── sqlite-vec helpers ────────────────────────────────────────────────────────
 
@@ -73,6 +90,7 @@ export const vektorConnector = {
     const limit       = opts['limit']     ? parseInt(opts['limit']) : null;
     const queryVecRaw = opts['vec-query'] || null; // JSON float array → ANN export
 
+    const Database = await getDatabase();
     const db     = new Database(dbPath, { readonly: true });
     const hasVec = loadSqliteVec(db) && vecAvailable(db);
 
@@ -146,6 +164,7 @@ export const vektorConnector = {
     const t0     = Date.now();
     const dbPath = opts['db'] || opts['path'] || 'slipstream-memory.db';
 
+    const Database = await getDatabase();
     const db = new Database(dbPath);
 
     // ensure base table exists (same schema as VEKTOR Slipstream)
@@ -243,6 +262,7 @@ export const vektorConnector = {
   async getDims(opts) {
     const dbPath = opts['db'] || opts['path'] || 'slipstream-memory.db';
     try {
+      const Database = await getDatabase();
       const db  = new Database(dbPath, { readonly: true });
       const row = db.prepare(
         `SELECT embedding FROM memories WHERE embedding IS NOT NULL LIMIT 1`
