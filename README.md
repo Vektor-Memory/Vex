@@ -1,4 +1,4 @@
-# Vex — Vector Exchange
+# vex — Vector Exchange
 
 > Cross-standard vector DB migration tool. Export, import, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
@@ -26,6 +26,8 @@ Every vector DB has a different API, a different format, and zero interop. Movin
 | `chroma`   | ✅ | ✅ | Stable — auto-create collection |
 | `weaviate` | ✅ | ✅ | Stable — GraphQL cursor pagination, extractStream |
 | `pgvector` | ✅ | ✅ | Stable — schema introspection, extractStream |
+| `vektor`   | ✅ | ✅ | Stable — sqlite-vec ANN optional |
+
 
 ## Install
 
@@ -41,6 +43,7 @@ npm i @vektormemory/vex-adapter
 ```
 
 **Requirements:** Node.js >= 18 (native fetch required). No extra dependencies for Pinecone, Qdrant, Chroma, or Weaviate — connectors use the built-in fetch API. pgvector requires `npm install pg`.
+VEKTOR sqlite-vec ANN (optional): `npm install sqlite-vec` — enables native ANN search, falls back gracefully if absent.
 
 ## Commands
 
@@ -199,6 +202,31 @@ After import, the sidecar is updated with `imported_to` and `imported_at` fields
 │  duration        : 87.3s
 └────────────────────────────────────────────
 ```
+## sqlite-vec (Optional — ANN Search)
+
+The `vektor` connector supports [sqlite-vec](https://github.com/asg017/sqlite-vec) for native approximate nearest neighbour search inside SQLite. Without it, vex works fine — search falls back to standard `ORDER BY created_at` export.
+
+**Install the peer dep:**
+```bash
+npm install sqlite-vec
+```
+
+**Backfill existing database:**
+```bash
+node scripts/migrate-vec.mjs --db slipstream-memory.db
+node scripts/migrate-vec.mjs --db slipstream-memory.db --dims 768  # if not 384
+node scripts/migrate-vec.mjs --db slipstream-memory.db --dry-run   # check only
+```
+
+**ANN-ordered export:**
+```bash
+vex export --from vektor --db memory.db \
+  --vec-query '[0.021, -0.043, 0.018, ...]' \
+  --limit 50 \
+  --output results.vmig.jsonl
+```
+
+Returns the top-k most semantically similar records ordered by cosine distance — no full table scan, no JS loop.
 
 ## Roadmap
 
@@ -227,6 +255,9 @@ After import, the sidecar is updated with `imported_to` and `imported_at` fields
 - Re-embedding pipeline — `--reembed` from `text` field via OpenAI or Ollama
 - vec2vec adapter — `--adapter` projects embeddings between models without any API call
 - Streaming for >100k vectors — line-by-line export/import, never loads full dataset into memory
+- sqlite-vec ANN index support for VEKTOR connector — native cosine search inside SQLite
+- `scripts/migrate-vec.mjs` — one-shot backfill tool for existing databases
+- `--vec-query` flag — ANN-ordered export without full table scan
 
 **v0.4 (premium)**
 - Pre-trained vex-adapter weights (vec2vec translation — no re-embedding required)

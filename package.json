@@ -1,7 +1,7 @@
 {
   "name": "@vektormemory/vex",
   "version": "0.3.0",
-  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory.",
+  "description": "Cross-standard vector DB migration tool \u2014 .vmig.jsonl interchange format for agent memory.",
   "type": "module",
   "bin": {
     "vex": "./vex.mjs"
@@ -13,6 +13,7 @@
     "connectors/",
     "utils/",
     "core/",
+    "scripts/",
     "README.md",
     "CHANGELOG.md"
   ],
@@ -38,5 +39,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "peerDependencies": {
+    "sqlite-vec": ">=0.1.0"
+  }
 }
