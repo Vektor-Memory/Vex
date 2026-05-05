@@ -165,6 +165,8 @@ One JSON object per line. UTF-8. Portable across any vector store.
 }
 ```
 
+<img width="1187" height="552" alt="image" src="https://github.com/user-attachments/assets/5a5a8e92-6deb-4322-a5a8-9597f4a524ca" />
+
 **Key decisions:**
 - Metadata is **flat** — Pinecone compatible out of the box
 - `namespace` is top-level — structural routing, not descriptive metadata
