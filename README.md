@@ -2,6 +2,7 @@
 
 > Cross-standard vector DB migration tool. Export, import, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
+https://medium.com/ai-in-plain-english/your-agent-memory-is-trapped-heres-the-key-87224b483534
 
 <img width="1086" height="519" alt="image" src="https://github.com/user-attachments/assets/4d847c0c-eced-40d5-8013-f1480475931f" />
 
