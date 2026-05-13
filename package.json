@@ -1,7 +1,7 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.3.0",
-  "description": "Cross-standard vector DB migration tool \u2014 .vmig.jsonl interchange format for agent memory.",
+  "version": "0.3.3",
+  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory.",
   "type": "module",
   "bin": {
     "vex": "./vex.mjs"
@@ -15,9 +15,10 @@
     "core/",
     "scripts/",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md"
   ],
-  "license": "Apache-2.0",
   "keywords": [
     "vector",
     "database",
@@ -29,17 +30,31 @@
     "agent-memory",
     "weaviate",
     "pgvector",
-    "chroma"
+    "chroma",
+    "cli",
+    "vmig"
   ],
+  "author": "Vektor Memory <hello@vektormemory.com>",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/vektor-memory/vex",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vektormemory/vex"
+    "url": "https://github.com/vektor-memory/vex"
+  },
+  "bugs": {
+    "url": "https://github.com/vektor-memory/vex/issues",
+    "email": "hello@vektormemory.com"
+  },
+  "funding": {
+    "type": "other",
+    "url": "https://vektormemory.com/downloads"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {},
-  "devDependencies": {},
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
+  },
   "peerDependencies": {
     "sqlite-vec": ">=0.1.0"
   }
