@@ -33,7 +33,7 @@ Your memory is always exportable, always portable, always verifiable, always you
 - **`vex sign`** — BLAKE3 content-addresses every record, Ed25519 signs the root hash. Writes a `.vmig.sig` sidecar.
 - **`vex verify`** — Recomputes all hashes, verifies the signature. Exits 0 (valid) or 1 (tampered). Pipeline-safe.
 - **`--sign` flag** — Auto-sign immediately after export in one command.
-- **`--components` flag** — Selective disclosure. Export only `working`, `semantic`, `procedural`, `episodic`, or `identity` memories. Mirrors the [PAM five-component model](https://arxiv.org/abs/2605.11032).
+- **`--components` flag** — Selective disclosure. Export only `working`, `semantic`, `procedural`, `episodic`, or `identity` memories.
 - **LangChain adapter** — `VektorMemory` class, drop-in `BaseMemory` for any LangChain chain.
 - **Dynamic schema detection** — vektor connector now handles all SDK versions automatically via `PRAGMA table_info`.
 
