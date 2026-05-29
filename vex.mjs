@@ -3,6 +3,7 @@ import { getConnector }                          from './connectors/index.js';
 import { writeMeta, readJsonl, validate }        from './formats/vmig.js';
 import { streamExport, streamImport, migrate as coreMigrate } from './core/migrate.js';
 import { listAdapters }                          from './utils/adapt.js';
+import { signExport, verifyExport }              from './core/sign.js';
 import fs                                        from 'fs';
 import readline                                  from 'readline';
 
@@ -37,7 +38,7 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 // ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
@@ -83,6 +84,8 @@ function showHelp() {
   row(W('export'),   Sk('vex export')    + Gr('  --from <store>  --output <file.vmig.jsonl>'));
   row(W('import'),   Sk('vex import')    + Gr('  --from <file>   --to <store>'));
   row(W('migrate'),  Sk('vex migrate')   + Gr('  --from <store>  --to <store>'));
+  row(W('sign'),     Sk('vex sign')      + Gr('  <file>  — BLAKE3 + Ed25519 sign export'));
+  row(W('verify'),   Sk('vex verify')    + Gr('  <file>  — verify signature (exit 0=ok 1=tampered)'));
   row(W('inspect'),  Sk('vex inspect')   + Gr('  <file>  — show stats, models, namespaces'));
   row(W('validate'), Sk('vex validate')  + Gr('  <file>  — lint all records'));
   row(W('adapters'), Sk('vex adapters')  + Gr('  — list available vec2vec projection pairs'));
@@ -100,13 +103,29 @@ function showHelp() {
 
   box('COMMON FLAGS');
   row(Sk('--namespace'),     Gr('<ns>     filter by namespace on export'));
+  row(Sk('--components'),    Gr('<types>  filter by memory_type: working,semantic,procedural,episodic,identity'));
   row(Sk('--limit'),         Gr('<n>      max records to export'));
   row(Sk('--output'),        Gr('<file>   destination .vmig.jsonl'));
   row(Sk('--db'),            Gr('<path>   VEKTOR SQLite DB path'));
+  row(Sk('--sign'),          G('v0.4') + Gr('   auto-sign after export (BLAKE3 + Ed25519)'));
   row(Sk('--reembed'),       Gr('         re-embed dim-mismatched records from text'));
   row(Sk('--adapter'),       G('vec2vec') + Gr(' translate embeddings — no API required'));
   row(Sk('--adapter-model'), Gr('<model>  target model name for --adapter'));
   row(Sk('--embed-model'),   Gr('<model>  model for --reembed (default: text-embedding-3-small)'));
+  boxEnd();
+
+  box('SIGN / VERIFY  (v0.4)');
+  row(Sk('--key'),     Gr('<path>  private key file (auto-generated if missing)'));
+  row(Sk('--sig'),     Gr('<path>  .vmig.sig file (default: <file>.vmig.sig)'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Sign an export (generates .vmig.sig + .vmig.key)'));
+  console.log('  ' + BAR + '  ' + Sk('vex sign') + ' memories.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Verify integrity (exits 0=valid, 1=tampered)'));
+  console.log('  ' + BAR + '  ' + Sk('vex verify') + ' memories.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export + auto-sign in one step'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --output mem.vmig.jsonl --sign');
   boxEnd();
 
   box('PINECONE OPTIONS');
@@ -154,6 +173,9 @@ function showHelp() {
   console.log('  ' + BAR + '  ' + Gr('# Export VEKTOR memory'));
   console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --output memories.vmig.jsonl');
   blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export working + procedural memories only (PAM five-component model)'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --components working,procedural --output state.vmig.jsonl');
+  blank();
   console.log('  ' + BAR + '  ' + Gr('# Export specific namespace only'));
   console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --namespace trading --output trading.vmig.jsonl');
   blank();
@@ -168,6 +190,12 @@ function showHelp() {
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Migrate Qdrant → VEKTOR'));
   console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from qdrant --to vektor --collection memories --db memory.db');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Sign an export for tamper-evident transfer'));
+  console.log('  ' + BAR + '  ' + Sk('vex sign') + ' memories.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Verify before importing'));
+  console.log('  ' + BAR + '  ' + Sk('vex verify') + ' memories.vmig.jsonl && vex import --from memories.vmig.jsonl --to qdrant --collection mem');
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Inspect a file'));
   console.log('  ' + BAR + '  ' + Sk('vex inspect') + ' memories.vmig.jsonl');
@@ -288,27 +316,129 @@ async function cmdAdapters() {
   boxEnd();
 }
 
+// ── SIGN ───────────────────────────────────────────────────────────────────
+async function cmdSign(file, flags) {
+  if (!file || !fs.existsSync(file)) {
+    console.error(R(`\n  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+  }
+  banner();
+  console.log('  ' + G('→') + '  Signing ' + Gr(file) + '\n');
+  try {
+    const sig = await signExport(file, {
+      keyFile: flags.key || null,
+      saveKey: true,
+    });
+    console.log('\n  ' + G('✓') + '  ' + W(String(sig.record_count)) + ' records signed');
+    console.log('  ' + G('✓') + '  Signature → ' + Gr(file.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
+  } catch (err) {
+    if (err.message.includes('@noble')) {
+      console.error('\n' + Y('  ⚠  Signing requires @noble packages:'));
+      console.error(Y('     npm install @noble/hashes @noble/ed25519') + '\n');
+    } else {
+      console.error('\n' + R(`  ✗  ${err.message}`));
+    }
+    process.exit(1);
+  }
+}
+
+// ── VERIFY ─────────────────────────────────────────────────────────────────
+async function cmdVerify(file, flags) {
+  if (!file || !fs.existsSync(file)) {
+    console.error(R(`\n  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+  }
+  banner();
+  console.log('  ' + G('→') + '  Verifying ' + Gr(file) + '\n');
+  try {
+    const result = await verifyExport(file, { sigFile: flags.sig || null });
+    if (result.valid) {
+      console.log('\n  ' + G('✓') + '  ' + W('Signature valid') + ' — file has not been tampered with\n');
+      process.exit(0);
+    } else {
+      console.log('\n  ' + R('✗  Verification FAILED'));
+      for (const e of result.errors) console.log('  ' + R('   → ') + Gr(e));
+      console.log('');
+      process.exit(1);
+    }
+  } catch (err) {
+    if (err.message.includes('@noble')) {
+      console.error('\n' + Y('  ⚠  Verification requires @noble packages:'));
+      console.error(Y('     npm install @noble/hashes @noble/ed25519') + '\n');
+    } else {
+      console.error('\n' + R(`  ✗  ${err.message}`));
+    }
+    process.exit(1);
+  }
+}
+
 // ── EXPORT ─────────────────────────────────────────────────────────────────
 async function cmdExport(flags) {
   if (!flags.from)   { console.error(R('\n  ✗  --from required'));   process.exit(1); }
   if (!flags.output && !flags.o) { console.error(R('\n  ✗  --output required')); process.exit(1); }
 
-  const outPath  = flags.output || flags.o;
+  const outPath   = flags.output || flags.o;
   const connector = getConnector(flags.from);
 
-  banner();
-  const nsLabel  = flags.namespace ? Gr(` [ns: ${flags.namespace}]`)  : '';
-  const limLabel = flags.limit     ? Gr(` [limit: ${flags.limit}]`)   : '';
-  console.log('  ' + G('→') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + '\n');
+  // ── --components filter (PAM five-component selective disclosure) ────────
+  // Parse: --components working,procedural  → filters records by memory_type
+  if (flags.components) {
+    const allowed = new Set(
+      String(flags.components).toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
+    );
+    const VALID_TYPES = new Set(['episodic', 'semantic', 'procedural', 'working', 'identity']);
+    for (const t of allowed) {
+      if (!VALID_TYPES.has(t)) {
+        console.error(R(`\n  ✗  Unknown component type: "${t}"`));
+        console.error(Gr('     Valid types: episodic, semantic, procedural, working, identity'));
+        process.exit(1);
+      }
+    }
+    // Inject filter into flags so streamExport / vektor connector can use it
+    flags._componentFilter = allowed;
+    console.log('  ' + G('→') + '  Component filter: ' + Ic([...allowed].join(', ')));
+  }
 
-  const total = await streamExport(connector, flags, outPath);
+  banner();
+  const nsLabel    = flags.namespace  ? Gr(` [ns: ${flags.namespace}]`)           : '';
+  const limLabel   = flags.limit      ? Gr(` [limit: ${flags.limit}]`)             : '';
+  const compLabel  = flags.components ? Y(`  [components: ${flags.components}]`)   : '';
+  console.log('  ' + G('→') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + compLabel + '\n');
+
+  let total = await streamExport(connector, flags, outPath);
+
+  // ── Post-export component filter (applied after stream if connector doesn't support it natively) ──
+  if (flags._componentFilter) {
+    const allowed = flags._componentFilter;
+    const raw     = fs.readFileSync(outPath, 'utf8').split('\n').filter(l => l.trim());
+    const filtered = raw.filter(line => {
+      try {
+        const r = JSON.parse(line);
+        const mt = (r.metadata?.memory_type || r.memory_type || 'semantic').toLowerCase();
+        return allowed.has(mt);
+      } catch { return false; }
+    });
+    fs.writeFileSync(outPath, filtered.join('\n') + '\n', 'utf8');
+    total = filtered.length;
+    console.log(`  ${G('→')}  Component filter applied: ${total} records kept`);
+  }
 
   await writeMeta(outPath, {
     source_store: flags.from,
     exported_at:  new Date().toISOString(),
+    components:   flags.components || null,
   });
 
   console.log('\n  ' + G('✓') + '  ' + W(String(total)) + ' records exported → ' + Gr(outPath) + '\n');
+
+  // ── Auto-sign if --sign flag present ────────────────────────────────────
+  if (flags.sign) {
+    console.log('  ' + G('→') + '  Auto-signing...\n');
+    try {
+      await signExport(outPath, { keyFile: flags.key || null, saveKey: true });
+      console.log('  ' + G('✓') + '  Signed → ' + Gr(outPath.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
+    } catch (err) {
+      console.warn(Y(`  ⚠  Sign failed (install @noble/hashes @noble/ed25519): ${err.message}`));
+    }
+  }
 }
 
 // ── IMPORT ─────────────────────────────────────────────────────────────────
@@ -362,9 +492,11 @@ async function interactiveMenu() {
     ['1', 'export',   'Export memory → .vmig.jsonl'],
     ['2', 'import',   'Import .vmig.jsonl → any store'],
     ['3', 'migrate',  'Migrate directly between stores'],
-    ['4', 'inspect',  'Inspect a .vmig.jsonl file'],
-    ['5', 'validate', 'Validate a .vmig.jsonl file'],
-    ['6', 'adapters', 'List vec2vec projection pairs'],
+    ['4', 'sign',     'Sign export (BLAKE3 + Ed25519)'],
+    ['5', 'verify',   'Verify signature'],
+    ['6', 'inspect',  'Inspect a .vmig.jsonl file'],
+    ['7', 'validate', 'Validate a .vmig.jsonl file'],
+    ['8', 'adapters', 'List vec2vec projection pairs'],
     ['h', 'help',     'Full help'],
     ['q', 'quit',     ''],
   ];
@@ -378,7 +510,7 @@ async function interactiveMenu() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   rl.question('  ' + Sk('→') + '  ', answer => {
     rl.close();
-    const map = { '1':'export','2':'import','3':'migrate','4':'inspect','5':'validate','6':'adapters' };
+    const map = { '1':'export','2':'import','3':'migrate','4':'sign','5':'verify','6':'inspect','7':'validate','8':'adapters' };
     const ch  = answer.trim().toLowerCase();
     console.log('');
     if (ch === 'h') { showHelp(); return; }
@@ -411,6 +543,8 @@ try {
   if (!cmd)                                 { await interactiveMenu();                                    }
   else if (['--help','-h','help'].includes(cmd)) { showHelp();                                            }
   else if (['--version','-v'].includes(cmd))     { console.log(`vex v${VERSION}`);                       }
+  else if (cmd === 'sign')                       { await cmdSign(args[1] || flags.file || flags.from, flags); }
+  else if (cmd === 'verify')                     { await cmdVerify(args[1] || flags.file || flags.from, flags); }
   else if (cmd === 'inspect')                    { await cmdInspect(args[1] || flags.file || flags.from); }
   else if (cmd === 'validate')                   { await cmdValidate(args[1] || flags.file || flags.from);}
   else if (cmd === 'adapters')                   { await cmdAdapters();                                   }

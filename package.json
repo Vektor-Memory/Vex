@@ -1,18 +1,24 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory.",
   "type": "module",
   "bin": {
     "vex": "./vex.mjs"
   },
   "main": "./vex.mjs",
+  "exports": {
+    ".": "./vex.mjs",
+    "./adapters/langchain": "./adapters/langchain.js",
+    "./core/sign": "./core/sign.js"
+  },
   "files": [
     "vex.mjs",
     "formats/",
     "connectors/",
     "utils/",
     "core/",
+    "adapters/",
     "scripts/",
     "README.md",
     "CHANGELOG.md",
@@ -32,7 +38,11 @@
     "pgvector",
     "chroma",
     "cli",
-    "vmig"
+    "vmig",
+    "langchain",
+    "memory-portability",
+    "blake3",
+    "ed25519"
   ],
   "author": "Vektor Memory <hello@vektormemory.com>",
   "license": "Apache-2.0",
@@ -55,7 +65,24 @@
   "dependencies": {
     "better-sqlite3": "^12.9.0"
   },
+  "optionalDependencies": {
+    "@noble/ed25519": "^2.3.0",
+    "@noble/hashes": "^1.8.0"
+  },
   "peerDependencies": {
-    "sqlite-vec": ">=0.1.0"
+    "@langchain/core": ">=0.2.0",
+    "sqlite-vec": ">=0.1.0",
+    "vektor-slipstream": ">=1.6.0"
+  },
+  "peerDependenciesMeta": {
+    "sqlite-vec": {
+      "optional": true
+    },
+    "@langchain/core": {
+      "optional": true
+    },
+    "vektor-slipstream": {
+      "optional": true
+    }
   }
 }

@@ -91,8 +91,25 @@ export const vektorConnector = {
     const queryVecRaw = opts['vec-query'] || null; // JSON float array → ANN export
 
     const Database = await getDatabase();
-    const db     = new Database(dbPath, { readonly: true });
+    // Normalise Windows backslash paths
+    const normPath = dbPath.replace(/\\/g, '/');
+    const db     = new Database(normPath, { readonly: true });
     const hasVec = loadSqliteVec(db) && vecAvailable(db);
+
+    // Verify memories table exists and log count
+    try {
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
+      console.log(`[vektor] tables: ${tables.join(', ')}`);
+      if (tables.includes('memories')) {
+        const cnt = db.prepare('SELECT COUNT(*) as n FROM memories').get();
+        console.log(`[vektor] memories count: ${cnt.n}`);
+      } else {
+        throw new Error('[vektor] "memories" table not found in DB. Available: ' + tables.join(', '));
+      }
+    } catch (e) {
+      if (e.message.includes('memories')) throw e;
+      // non-fatal — continue
+    }
 
     // ── ANN-ordered export via sqlite-vec ──────────────────────────────────
     if (queryVecRaw && hasVec) {
@@ -140,13 +157,37 @@ export const vektorConnector = {
       console.warn('[vektor] --vec-query ignored: memories_vec not available. Run scripts/migrate-vec.mjs first.');
     }
 
-    let sql = `
-      SELECT id, content AS text, embedding AS vector, metadata, created_at, namespace
-      FROM memories
-    `;
+    // ── Detect actual column names — schema varies across SDK versions ────────
+    const colInfo  = db.prepare('PRAGMA table_info(memories)').all();
+    const colNames = colInfo.map(c => c.name);
+
+    const vecCol  = colNames.includes('embedding') ? 'embedding'
+                  : colNames.includes('vector')    ? 'vector'
+                  : null;
+    if (!vecCol) throw new Error('[vektor] memories table has no embedding or vector column');
+
+    const hasMeta      = colNames.includes('metadata');
+    const hasNs        = colNames.includes('namespace');
+    const hasCreatedAt = colNames.includes('created_at');
+    const hasImportance= colNames.includes('importance');
+    const hasTags      = colNames.includes('tags');
+
+    // Build SELECT dynamically from available columns
+    const selectCols = [
+      'id',
+      'content AS text',
+      `${vecCol} AS vector`,
+      hasMeta       ? 'metadata'   : 'NULL AS metadata',
+      hasNs         ? 'namespace'  : 'NULL AS namespace',
+      hasCreatedAt  ? 'created_at' : 'NULL AS created_at',
+      hasImportance ? 'importance' : 'NULL AS importance',
+      hasTags       ? 'tags'       : 'NULL AS tags',
+    ].join(', ');
+
+    let sql = `SELECT ${selectCols} FROM memories`;
     const params = [];
-    if (namespace) { sql += ` WHERE namespace = ?`; params.push(namespace); }
-    sql += ` ORDER BY created_at DESC`;
+    if (namespace && hasNs) { sql += ` WHERE namespace = ?`; params.push(namespace); }
+    sql += ` ORDER BY ${hasCreatedAt ? 'created_at' : 'id'} DESC`;
     if (limit) { sql += ` LIMIT ?`; params.push(limit); }
 
     const rows = db.prepare(sql).all(...params);
@@ -155,6 +196,12 @@ export const vektorConnector = {
     return rows.map(row => {
       let meta = null;
       try { meta = row.metadata ? JSON.parse(row.metadata) : null; } catch {}
+      // Fold importance + tags into metadata for portability
+      if (row.importance != null || row.tags) {
+        meta = meta || {};
+        if (row.importance != null) meta.importance = row.importance;
+        if (row.tags)               meta.tags       = row.tags;
+      }
       return toRecord({ ...row, vector: blobToVector(row.vector), metadata: meta }, 'vektor');
     });
   },
@@ -264,12 +311,14 @@ export const vektorConnector = {
     try {
       const Database = await getDatabase();
       const db  = new Database(dbPath, { readonly: true });
+      const colInfo2 = db.prepare('PRAGMA table_info(memories)').all();
+      const vcol     = colInfo2.map(c => c.name).includes('embedding') ? 'embedding' : 'vector';
       const row = db.prepare(
-        `SELECT embedding FROM memories WHERE embedding IS NOT NULL LIMIT 1`
+        `SELECT ${vcol} AS vec FROM memories WHERE ${vcol} IS NOT NULL LIMIT 1`
       ).get();
       db.close();
-      if (!row?.embedding) return null;
-      const buf = Buffer.isBuffer(row.embedding) ? row.embedding : Buffer.from(row.embedding);
+      if (!row?.vec) return null;
+      const buf = Buffer.isBuffer(row.vec) ? row.vec : Buffer.from(row.vec);
       return buf.byteLength / 4; // Float32 = 4 bytes each
     } catch {
       return null;

@@ -44,14 +44,33 @@ export function writeJsonl(records, filePath) {
   writeMeta(records, filePath);
 }
 
-export function writeMeta(records, filePath, extra = {}) {
+export function writeMeta(recordsOrPath, filePathOrExtra = {}, extra = {}) {
+  // Support two call signatures:
+  //   writeMeta(records, filePath, extra?)  — called from writeJsonl
+  //   writeMeta(filePath, extra?)           — called from vex.mjs cmdExport
+  let records, filePath, extraOpts;
+
+  if (typeof recordsOrPath === 'string') {
+    // signature: writeMeta(filePath, extra?)
+    filePath  = recordsOrPath;
+    records   = [];
+    extraOpts = filePathOrExtra || {};
+  } else {
+    // signature: writeMeta(records, filePath, extra?)
+    records   = recordsOrPath || [];
+    filePath  = filePathOrExtra;
+    extraOpts = extra || {};
+  }
+
   const meta = {
     exported_at:  new Date().toISOString(),
-    source_store: records[0]?.source_store ?? null,
-    record_count: records.length,
-    checksum:     `sha256:${checksumRecords(records)}`,
+    source_store: records[0]?.source_store ?? extraOpts.source_store ?? null,
+    record_count: Array.isArray(records) ? records.length : 0,
+    checksum:     Array.isArray(records) && records.length
+                    ? `sha256:${checksumRecords(records)}`
+                    : null,
     vex_version:  VEX_VERSION,
-    ...extra,
+    ...extraOpts,
   };
   const metaPath = filePath.replace(/\.vmig\.jsonl$/, '.vmig.meta.json');
   fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
