@@ -111,16 +111,6 @@ vex export --from vektor --db memory.db --components "working,procedural" --outp
 vex export --from vektor --db memory.db --components "semantic" --output facts.vmig.jsonl
 ```
 
-**Memory type taxonomy** (mirrors [PAM arXiv:2605.11032](https://arxiv.org/abs/2605.11032)):
-
-| Type | Description | Use case |
-|------|-------------|----------|
-| `working` | Current goals, TODOs, active state | Planning agents |
-| `semantic` | Facts, knowledge, assertions | Q&A agents |
-| `procedural` | Skills, workflows, architecture | Coding agents |
-| `episodic` | Time-ordered events, decisions | Temporal reasoning |
-| `identity` | Preferences, persona, instructions | Personalisation |
-
 Memory types are stored via [VEKTOR Slipstream](https://vektormemory.com) SDK v1.6.1+:
 ```js
 await memory.remember('TODO: ship vex v0.4', { importance: 5, memory_type: 'working' });
