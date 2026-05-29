@@ -9,7 +9,6 @@ Vex — Vector Exchange v0.4.0
 
 https://medium.com/ai-in-plain-english/your-agent-memory-is-trapped-heres-the-key-87224b483534
 
-<img width="1086" height="519" alt="image" src="https://github.com/user-attachments/assets/4d847c0c-eced-40d5-8013-f1480475931f" />
 
 ```bash
 npx @vektormemory/vex export --from vektor --db slipstream-memory.db --output memories.vmig.jsonl
