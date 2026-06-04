@@ -20,41 +20,59 @@ npx @vektormemory/vex import --from memories.vmig.jsonl --to pinecone --api-key 
 npx @vektormemory/vex migrate --from vektor --to qdrant --db memory.db --url http://localhost:6333 --collection memories
 ```
 
-## Why
+# Why
 
-Every vector DB has a different API, a different format, and zero interop. Moving your agent memory from VEKTOR to Pinecone, or Qdrant to Weaviate, means writing a one-off script every time.
+Every vector DB has a different API, a different format, and zero interop. Every LLM platform locks your conversation history behind a proprietary export. Moving your agent memory between systems means writing a one-off script every time.
 
-`vex` fixes that with a single open format, a growing connector library, and — as of v0.4.0 — cryptographic signing so you can prove your agent memory hasn't been tampered with in transit.
+`vex` fixes that with a single open format, a growing connector library, and a set of format adapters that turn your conversation history into whatever shape any LLM provider needs. Your memory is always exportable, always portable, always verifiable, always yours.
 
-Your memory is always exportable, always portable, always verifiable, always yours.
+---
 
-## What's New in v0.4.0
+# What's New in v0.6.0
 
-- **`vex sign`** — BLAKE3 content-addresses every record, Ed25519 signs the root hash. Writes a `.vmig.sig` sidecar.
-- **`vex verify`** — Recomputes all hashes, verifies the signature. Exits 0 (valid) or 1 (tampered). Pipeline-safe.
-- **`--sign` flag** — Auto-sign immediately after export in one command.
-- **`--components` flag** — Selective disclosure. Export only `working`, `semantic`, `procedural`, `episodic`, or `identity` memories.
-- **LangChain adapter** — `VektorMemory` class, drop-in `BaseMemory` for any LangChain chain.
-- **Dynamic schema detection** — vektor connector now handles all SDK versions automatically via `PRAGMA table_info`.
+**Conversation portability.** Import your entire Claude or ChatGPT history into any vector DB in one command. Convert it to OpenAI fine-tuning format, Anthropic Messages API, Groq, Perplexity, Mistral, or plain text. Your conversations are now first-class agent memory.
 
-## Connectors
+- **`claude-export` connector** — import from the official claude.ai data export. Handles both claude.ai and API shapes. Three chunking modes: `turn`, `conversation`, `exchange`.
+- **`chatgpt-export` connector** — import from the official ChatGPT data export. Reconstructs the active conversation thread from ChatGPT's tree-structured mapping format.
+- **`vex convert` command** — transform `.vmig.jsonl` into provider-specific formats for fine-tuning or context injection. Five adapters: `openai-finetune`, `openai-context`, `generic-chat`, `anthropic-finetune`, `plain-text`.
+- **Schema-adaptive `vektor` connector** — `load()` now detects the target DB's column names, primary key type, and schema version at runtime. Works with any VEKTOR DB — minimal, full SDK, integer ID, TEXT ID — without modification.
+- **Accurate import counters** — summary numbers now come from the connector's own upserted/skipped counts, not a vector-presence heuristic. Text-only imports (no vectors) show the correct count.
 
-| Connector | Export | Import | Status |
-|-----------|--------|--------|--------|
-| `vektor`   | ✅ | ✅ | Stable — dynamic schema, sqlite-vec ANN optional |
-| `jsonl`    | ✅ | ✅ | Stable |
-| `pinecone` | ✅ | ✅ | Stable — tested 4,900 vectors |
-| `qdrant`   | ✅ | ✅ | Stable — tested 3,917 vectors, auto-create |
-| `chroma`   | ✅ | ✅ | Stable — auto-create collection |
-| `weaviate` | ✅ | ✅ | Stable — GraphQL cursor pagination, extractStream |
-| `pgvector` | ✅ | ✅ | Stable — schema introspection, extractStream |
+---
 
-<img width="1189" height="422" alt="image" src="https://github.com/user-attachments/assets/cf1473e1-d4a3-4283-8064-32bf79df6067" />
+# Connectors
 
-## Install
+| Connector | Export | Import | Notes |
+|-----------|--------|--------|-------|
+| `vektor` | ✅ | ✅ | VEKTOR Slipstream SQLite — schema-adaptive, sqlite-vec ANN optional |
+| `jsonl` | ✅ | ✅ | `.vmig.jsonl` round-trip |
+| `pinecone` | ✅ | ✅ | Tested 4,900 vectors |
+| `qdrant` | ✅ | ✅ | Tested 3,917 vectors, auto-create collection |
+| `chroma` | ✅ | ✅ | Auto-create collection |
+| `weaviate` | ✅ | ✅ | GraphQL cursor pagination, extractStream |
+| `pgvector` | ✅ | ✅ | Schema introspection, extractStream |
+| `claude-export` | ✅ | — | Claude conversation JSON → vmig |
+| `chatgpt-export` | ✅ | — | ChatGPT conversation JSON → vmig |
+
+---
+
+# Convert Adapters
+
+| Adapter | Output | Use |
+|---------|--------|-----|
+| `openai-finetune` | `.jsonl` | Upload to `POST /v1/files` → `/v1/fine_tuning/jobs` |
+| `openai-context` | `.json` | Inject as context into any chat completion call |
+| `generic-chat` | `.jsonl` | Perplexity, Groq, Mistral, Together, Fireworks, Cerebras |
+| `anthropic-finetune` | `.jsonl` | Anthropic Messages API format |
+| `plain-text` | `.txt` | Human-readable transcript |
+
+Aliases: `perplexity` / `groq` / `mistral` / `together` → `generic-chat` · `anthropic` → `anthropic-finetune` · `txt` → `plain-text`
+
+---
+
+# Install
 
 ```bash
-# Global install
 npm install -g @vektormemory/vex
 
 # Or run without installing
@@ -67,18 +85,71 @@ npm install @noble/hashes @noble/ed25519
 npm install @vektormemory/vex-adapter
 ```
 
-**Requirements:** Node.js >= 18. No extra dependencies for Pinecone, Qdrant, Chroma, or Weaviate — connectors use the built-in fetch API. pgvector requires `npm install pg`.
+Requirements: Node.js >= 18. No extra dependencies for Pinecone, Qdrant, Chroma, or Weaviate — connectors use the built-in fetch API. pgvector requires `npm install pg`.
 
-## Commands
+---
 
-### Sign & Verify (v0.4.0)
+# Commands
+
+## Conversation Export (v0.6.0)
+
+```bash
+# Claude — export from claude.ai Settings → Privacy → Export Data
+vex export --from claude-export --file conversations.json --output claude.vmig.jsonl
+
+# ChatGPT — export from Settings → Data Controls → Export Data
+vex export --from chatgpt-export --file conversations.json --output chatgpt.vmig.jsonl
+
+# Migrate directly into VEKTOR DB (no intermediate file)
+vex migrate --from claude-export --to vektor \
+  --file conversations.json --db memory.db
+
+# With chunking + embedding
+vex export --from claude-export --file conversations.json --output out.vmig.jsonl \
+  --chunk-mode exchange \
+  --sender both \
+  --namespace claude \
+  --after 2025-01-01 \
+  --openai-key $OPENAI_API_KEY
+
+# Chunking modes:
+#   turn         — one record per message (best for semantic search)
+#   conversation — one record per full conversation (best for summarisation)
+#   exchange     — one record per user+assistant pair (best for fine-tuning)
+```
+
+## Convert — LLM Provider Formats (v0.6.0)
+
+```bash
+# List all adapters
+vex convert --adapter list
+
+# → OpenAI fine-tuning
+vex convert --from claude.vmig.jsonl --adapter openai-finetune --output finetune.jsonl
+
+# → OpenAI context injection (continue a conversation in GPT-4o)
+vex convert --from claude.vmig.jsonl --adapter openai-context --output context.json
+
+# → Perplexity / Groq / Mistral / Together
+vex convert --from claude.vmig.jsonl --adapter generic-chat --output chat.jsonl
+
+# → Anthropic Messages API
+vex convert --from claude.vmig.jsonl --adapter anthropic-finetune --output anthropic.jsonl
+
+# → Plain text transcript
+vex convert --from claude.vmig.jsonl --adapter plain-text --output transcripts.txt
+
+# With system prompt
+vex convert --from claude.vmig.jsonl --adapter openai-finetune \
+  --system-prompt "You are an expert AI memory systems engineer." \
+  --output finetune.jsonl
+```
+
+## Sign & Verify (v0.4.0)
 
 ```bash
 # Sign an export — generates .vmig.sig + .vmig.key
 vex sign memories.vmig.jsonl
-
-# Sign with an existing key
-vex sign memories.vmig.jsonl --key memories.vmig.key
 
 # Verify integrity (exit 0 = valid, exit 1 = tampered)
 vex verify memories.vmig.jsonl
@@ -90,209 +161,113 @@ vex verify memories.vmig.jsonl && vex import --from memories.vmig.jsonl --to qdr
 vex export --from vektor --db memory.db --output memories.vmig.jsonl --sign
 ```
 
-The `.vmig.sig` sidecar contains:
-- BLAKE3 hash of every individual record (canonical JSON)
-- Root hash (BLAKE3 of the array of record hashes)
-- Ed25519 signature of the root hash
-- Public key (verifier needs no private key)
-
-Tamper with any byte in any record and `vex verify` will catch it.
-
-### Selective Disclosure (v0.4.0)
-
-Export only specific memory component types — useful for multi-agent handoffs where different agents need different context.
+## Selective Disclosure (v0.4.0)
 
 ```bash
 # Export only working memory (current goals, TODOs, status)
-vex export --from vektor --db memory.db --components "working" --output todos.vmig.jsonl
+vex export --from vektor --db memory.db --components working --output todos.vmig.jsonl
 
 # Export working + procedural (skills + state) for a coding agent
-vex export --from vektor --db memory.db --components "working,procedural" --output coding-ctx.vmig.jsonl
-
-# Export semantic only (facts, knowledge)
-vex export --from vektor --db memory.db --components "semantic" --output facts.vmig.jsonl
+vex export --from vektor --db memory.db --components working,procedural --output coding-ctx.vmig.jsonl
 ```
 
-Memory types are stored via [VEKTOR Slipstream](https://vektormemory.com) SDK v1.6.1+:
-```js
-await memory.remember('TODO: ship vex v0.4', { importance: 5, memory_type: 'working' });
-await memory.remember('JWT tokens expire after 24 hours', { importance: 4, memory_type: 'semantic' });
+Memory types: `episodic` · `semantic` · `procedural` · `working` · `identity`
+
+## Export — Vector Stores
+
+```bash
+vex export --from vektor --db ./slipstream-memory.db --output memories.vmig.jsonl
+vex export --from qdrant --url http://localhost:6333 --collection memories --output memories.vmig.jsonl
+vex export --from pinecone --api-key $KEY --index my-index --host $HOST --output memories.vmig.jsonl
+vex export --from chroma --collection memories --output memories.vmig.jsonl
+vex export --from weaviate --url http://localhost:8080 --collection MyDocs --output memories.vmig.jsonl
+vex export --from pgvector --url postgres://user:pass@host/db --output memories.vmig.jsonl
 ```
 
-### LangChain Adapter (v0.4.0)
+## Import
 
-Drop-in `BaseMemory` implementation backed by VEKTOR Slipstream:
+```bash
+vex import --from memories.vmig.jsonl --to vektor --db ./target.db
+vex import --from memories.vmig.jsonl --to pinecone --api-key $KEY --index my-index --host $HOST
+vex import --from memories.vmig.jsonl --to qdrant --url http://localhost:6333 --collection memories
+vex import --from memories.vmig.jsonl --to chroma --collection memories
+vex import --from memories.vmig.jsonl --to pgvector --url postgres://user:pass@host/db
+```
+
+## Migrate (direct)
+
+```bash
+vex migrate --from vektor --to qdrant --db ./memory.db --url http://localhost:6333 --collection memories
+vex migrate --from vektor --to pgvector --db ./memory.db --url postgres://user:pass@host/db
+vex migrate --from claude-export --to vektor --file conversations.json --db memory.db
+```
+
+## Embedding Flags
+
+```bash
+# Re-embed via OpenAI
+vex migrate --from vektor --to qdrant --db memory.db --collection memories \
+  --reembed --embed-model text-embedding-3-small
+
+# Re-embed via Ollama (local)
+vex migrate --from vektor --to qdrant --db memory.db --collection memories \
+  --reembed --embed-model nomic-embed-text --ollama-url http://localhost:11434
+
+# vec2vec projection — no API call (premium)
+vex migrate --from memories.vmig.jsonl --to pinecone \
+  --adapter --adapter-model text-embedding-3-small
+```
+
+---
+
+# LangChain Adapter (v0.4.0)
 
 ```js
 import { createVektorMemory } from '@vektormemory/vex/adapters/langchain';
 import { ConversationChain } from 'langchain/chains';
 
-// From a DB path
 const vektorMem = await createVektorMemory({
   dbPath: './agent.db',
   topK: 5,
   importance: 3,
 });
 
-// Use in any LangChain chain
 const chain = new ConversationChain({ llm, memory: vektorMem });
 await chain.call({ input: 'What is our auth setup?' });
-
-// Or use standalone
-const ctx = await vektorMem.loadMemoryVariables({ input: 'JWT configuration' });
-console.log(ctx.history); // top-5 relevant memories as formatted string
-
-await vektorMem.saveContext(
-  { input: 'What DB do we use?' },
-  { output: 'PostgreSQL 15 with pgvector' }
-);
 ```
 
-**Options:**
-```js
-createVektorMemory({
-  dbPath:         './agent.db',   // path to VEKTOR SQLite DB
-  topK:           5,              // memories to inject per turn
-  memoryKey:      'history',      // key written into chain variables
-  minScore:       0.0,            // min similarity score to include
-  includeScores:  false,          // show similarity scores in output
-  importance:     3,              // importance for saved turns
-  returnMessages: false,          // return as ChatMessage[] for chat models
-})
-```
+---
 
-### Export
+# .vmig.jsonl Format
 
-```bash
-# Export VEKTOR memory
-vex export --from vektor --db ./slipstream-memory.db --output memories.vmig.jsonl
-
-# Export + sign in one step
-vex export --from vektor --db ./slipstream-memory.db --output memories.vmig.jsonl --sign
-
-# Export specific components only
-vex export --from vektor --db ./memory.db --components "working,procedural" --output ctx.vmig.jsonl
-
-# Export specific namespace
-vex export --from vektor --db ./memory.db --namespace trading --output trading.vmig.jsonl
-
-# Export from Qdrant
-vex export --from qdrant --url http://localhost:6333 --collection memories --output memories.vmig.jsonl
-
-# Export from Pinecone
-vex export --from pinecone --api-key $PINECONE_API_KEY --index my-index --host $HOST --output memories.vmig.jsonl
-
-# Export from ChromaDB
-vex export --from chroma --collection memories --output memories.vmig.jsonl
-
-# Export from Weaviate
-vex export --from weaviate --url http://localhost:8080 --collection MyDocs --output memories.vmig.jsonl
-
-# Export from pgvector
-vex export --from pgvector --url postgres://user:pass@host/db --table vex_vectors --output memories.vmig.jsonl
-```
-
-### Import
-
-```bash
-# → Pinecone
-vex import --from memories.vmig.jsonl --to pinecone \
-  --api-key $PINECONE_API_KEY \
-  --index my-index \
-  --host https://my-index-xxxx.svc.pinecone.io
-
-# → Qdrant (auto-creates collection if missing)
-vex import --from memories.vmig.jsonl --to qdrant \
-  --url https://xxxx.cloud.qdrant.io:6333 \
-  --collection my-collection \
-  --api-key $QDRANT_API_KEY
-
-# → Qdrant local (no auth)
-vex import --from memories.vmig.jsonl --to qdrant --collection memories
-
-# → ChromaDB
-vex import --from memories.vmig.jsonl --to chroma --collection memories
-
-# → Weaviate
-vex import --from memories.vmig.jsonl --to weaviate --url http://localhost:8080 --collection MyDocs
-
-# → pgvector (auto-creates table + ivfflat index)
-vex import --from memories.vmig.jsonl --to pgvector --url postgres://user:pass@host/db
-
-# → VEKTOR (re-import for cross-model transfer)
-vex import --from memories.vmig.jsonl --to vektor --db ./target.db
-```
-
-### Migrate (direct — no intermediate file)
-
-```bash
-# VEKTOR → Qdrant
-vex migrate --from vektor --to qdrant \
-  --db ./memory.db --url http://localhost:6333 --collection memories
-
-# VEKTOR → pgvector
-vex migrate --from vektor --to pgvector \
-  --db ./memory.db --url postgres://user:pass@host/db
-
-# VEKTOR → Weaviate
-vex migrate --from vektor --to weaviate \
-  --db ./memory.db --url http://localhost:8080 --collection Memories
-```
-
-### Embedding flags
-
-```bash
-# Re-embed from text field when moving between models (requires OpenAI key or Ollama)
-vex migrate --from vektor --to qdrant --db memory.db --collection memories \
-  --reembed --embed-model text-embedding-3-small
-
-# Ollama re-embed (local, no API key)
-vex migrate --from vektor --to qdrant --db memory.db --collection memories \
-  --reembed --embed-model nomic-embed-text --ollama-url http://localhost:11434
-
-# vec2vec projection — translate embeddings without any API call (premium)
-vex migrate --from memories.vmig.jsonl --to pinecone \
-  --adapter --adapter-model text-embedding-3-small
-
-# List available projection pairs
-vex adapters
-```
-
-## .vmig.jsonl Format
-
-One JSON object per line. UTF-8. Portable across any vector store.
+One JSON object per line. UTF-8. Portable across any vector store or LLM provider.
 
 ```json
 {
-  "id": "1234",
-  "text": "JWT tokens expire after 24 hours. Algorithm: RS256.",
+  "id": "019da9a0-eff2-71d0-ba1a-f03fb8f88b4f",
+  "text": "How do I configure VEKTOR with Claude Desktop?",
   "vector": [0.021, -0.043, 0.018, "...384 or 768 floats"],
-  "model": "bge-small-en-v1.5",
-  "dims": 384,
-  "namespace": "default",
+  "model": "text-embedding-3-small",
+  "dims": 1536,
+  "namespace": "claude-conversations",
   "metadata": {
-    "tags": "auth,security",
-    "importance": 4,
-    "memory_type": "semantic",
-    "agent_id": "default"
+    "role": "user",
+    "conversation_id": "abc123",
+    "conversation_name": "VEKTOR setup session",
+    "source_format": "claude-export",
+    "chunk_mode": "turn"
   },
-  "created_at": "2026-05-29T10:23:00.000Z",
-  "source_store": "vektor",
+  "created_at": "2026-04-20T06:43:10.837655Z",
+  "source_store": "claude-export",
   "vex_version": "1.0.0"
 }
 ```
 
-**Key decisions:**
-- Metadata is **flat** — Pinecone compatible out of the box
-- `namespace` is top-level — structural routing, not descriptive metadata
-- `text` field always preserved — enables cross-model re-embedding via `--reembed`
-- `memory_type` in metadata — enables `--components` selective disclosure
-- Sidecar `.vmig.meta.json` — record count, SHA-256 checksum, source store
-- Sidecar `.vmig.sig` — BLAKE3 Merkle root + Ed25519 signature (v0.4.0+)
+Text-only records (null vector) are valid vmig. They are BM25-searchable in VEKTOR and can be re-embedded at any time with `--reembed`.
 
-<img width="1187" height="552" alt="image" src="https://github.com/user-attachments/assets/5a5a8e92-6deb-4322-a5a8-9597f4a524ca" />
+---
 
-## Cryptographic Integrity (v0.4.0)
+# Cryptographic Integrity (v0.4.0)
 
 ```
 memories.vmig.jsonl     — your exported memories
@@ -301,99 +276,83 @@ memories.vmig.sig       — BLAKE3 Merkle root + Ed25519 signature
 memories.vmig.key       — your Ed25519 private key (keep safe)
 ```
 
-Verification is fully self-contained — the `.vmig.sig` file contains the public key, so anyone can verify without needing your private key:
+Verification is fully self-contained — the `.vmig.sig` file contains the public key:
 
 ```bash
 vex verify memories.vmig.jsonl
-# [vex verify] hashing 5725 records...
 # ✓  Signature valid — file has not been tampered with
 ```
 
-Verification checks three things:
-1. Every record's BLAKE3 hash matches the hash stored in `.vmig.sig`
-2. The root hash (BLAKE3 of all record hashes) matches
-3. The Ed25519 signature of the root hash is valid
+---
 
-## Embedding Handling
+# Embedding Handling
 
 | Scenario | Behaviour |
 |----------|-----------|
-| Same model, same dims | Vectors copied directly — no re-embedding |
+| Same model, same dims | Vectors copied directly |
 | Dim mismatch + `--reembed` | Re-embeds from `text` field via OpenAI or Ollama |
 | Dim mismatch + `--adapter` | vec2vec projection — no API call (premium) |
-| Dim mismatch, no flag | Records skipped with warning + count in summary |
-| `null` vector | Record skipped with warning |
-
-## Progress & Summary
-
-```
-[████████████████████] 100% pinecone (4900/4900)
-
-┌─ pinecone summary ─────────────────────────
-│  total records   : 4900
-│  upserted        : 4900
-│  skipped         : 0
-│  duration        : 87.3s
-└────────────────────────────────────────────
-```
-
-## sqlite-vec (Optional — ANN Search)
-
-The `vektor` connector supports [sqlite-vec](https://github.com/asg017/sqlite-vec) for native approximate nearest neighbour search inside SQLite. Without it, vex works fine — export falls back to standard `ORDER BY created_at`.
-
-```bash
-npm install sqlite-vec
-
-# Backfill existing database
-node scripts/migrate-vec.mjs --db slipstream-memory.db
-
-# ANN-ordered export
-vex export --from vektor --db memory.db \
-  --vec-query '[0.021, -0.043, 0.018, ...]' \
-  --limit 50 \
-  --output results.vmig.jsonl
-```
-
-## Roadmap
-
-**v0.0.1 — shipped** — VEKTOR export, JSONL round-trip, format spec v1.0.0
-
-**v0.1.0 — shipped** — Pinecone + Qdrant import, SHA-256 checksum, batch retry, progress bar
-
-**v0.2.0 — shipped** — Pinecone + Qdrant export, ChromaDB connector, `--namespace` + `--limit` flags
-
-**v0.3.0 — shipped** — Weaviate + pgvector connectors, `--reembed`, vec2vec adapter, streaming for >100k vectors, sqlite-vec ANN
-
-**v0.4.0 — shipped**
-- `vex sign` / `vex verify` — BLAKE3 + Ed25519 cryptographic signing
-- `--components` — selective disclosure by memory type
-- `--sign` — auto-sign on export
-- LangChain adapter — `VektorMemory` `BaseMemory` implementation
-- Dynamic schema detection — handles all VEKTOR SDK DB versions
-
-**v0.5.0 — planned**
-- `vex diff` — compare two `.vmig.jsonl` snapshots, surface added/removed/modified memories
-- Capability tokens — scoped read/export permissions per component type
-- TypeScript type definitions
-- Mem0 + Letta import connectors
-
-## Contributing
-
-PRs welcome — especially new connectors.
-
-Each connector is a single file in `connectors/` implementing:
-
-```js
-{ extract(opts), load(records, opts), extractStream(opts, onPage) }
-```
-
-See `connectors/qdrant.js` as the reference implementation. The Vex core handles batching, dimension filtering, retry, progress, and sidecar generation.
-
-## License
-
-Apache 2.0 — free to use, fork, and build on.
+| Dim mismatch, no flag | Records skipped with warning |
+| `null` vector | Stored as text-only — BM25 searchable, not ANN searchable |
 
 ---
 
-[npm](https://www.npmjs.com/package/@vektormemory/vex) · [Docs](https://vektormemory.com/vex)
-Built by [VEKTOR](https://vektormemory.com) — persistent semantic memory for AI agents.
+# Progress & Summary
+
+```
+[████████████████████] 100% vektor import (12491/12491)
+
+┌─ vektor summary ───────────────────────
+│  total records   : 12491
+│  upserted        : 12491
+│  skipped         : 0
+│  duration        : 2.3s
+└────────────────────────────────────────
+```
+
+---
+
+# Roadmap
+
+**v0.0.1 — shipped** · Initial scaffold, `.vmig.jsonl` spec, vektor export, jsonl round-trip
+
+**v0.1.0 — shipped** · Pinecone + Qdrant import, checksums, batch retry, progress bar
+
+**v0.2.0 — shipped** · Pinecone + Qdrant export, ChromaDB connector, namespace + limit flags
+
+**v0.3.0 — shipped** · Weaviate + pgvector connectors, re-embedding pipeline, vec2vec adapter, streaming >100k, sqlite-vec ANN
+
+**v0.4.0 — shipped** · BLAKE3 + Ed25519 signing, selective disclosure `--components`, LangChain adapter, dynamic schema detection
+
+**v0.5.0 — shipped** · `claude-export` connector, `vex convert` command, 5 LLM format adapters
+
+**v0.6.0 — shipped** · `chatgpt-export` connector, schema-adaptive vektor `load()`, accurate import counters
+
+**v0.7 — next**
+- Gemini export connector
+- `--reembed` in conversation export connectors
+- Streaming for large conversation exports (>50k records)
+
+**v0.8**
+- Perplexity + Grok export (CLOAK-assisted)
+- Cross-provider conversation deduplication
+
+---
+
+# Contributing
+
+PRs welcome — especially new connectors and convert adapters.
+
+Each **connector** is a single file in `connectors/` implementing `{ extract(opts), load(records, opts), extractStream(opts, onPage) }`. Source-only connectors (like `claude-export`) implement `extract` + `extractStream` only.
+
+Each **convert adapter** is an object in `adapters/convert/index.js` implementing `{ name, fileExtension, description, convert(records, opts) }`.
+
+See `connectors/qdrant.js` as the reference connector. See `adapters/convert/index.js` for the adapter pattern.
+
+---
+
+# License
+
+Apache 2.0 — free to use, fork, and build on.
+
+[npm](https://www.npmjs.com/package/@vektormemory/vex) · [Docs](https://vektormemory.com) · Built by [VEKTOR](https://vektormemory.com) — persistent semantic memory for AI agents.
