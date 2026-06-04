@@ -1,7 +1,7 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.4.0",
-  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory.",
+  "version": "0.6.0",
+  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory. Import Claude and ChatGPT conversations. Convert to OpenAI, Anthropic, Groq, Perplexity, Mistral formats.",
   "type": "module",
   "bin": {
     "vex": "./vex.mjs"
@@ -10,6 +10,7 @@
   "exports": {
     ".": "./vex.mjs",
     "./adapters/langchain": "./adapters/langchain.js",
+    "./adapters/convert": "./adapters/convert/index.js",
     "./core/sign": "./core/sign.js"
   },
   "files": [
@@ -42,7 +43,16 @@
     "langchain",
     "memory-portability",
     "blake3",
-    "ed25519"
+    "ed25519",
+    "claude",
+    "chatgpt",
+    "conversation-export",
+    "llm-portability",
+    "openai",
+    "fine-tuning",
+    "anthropic",
+    "groq",
+    "perplexity"
   ],
   "author": "Vektor Memory <hello@vektormemory.com>",
   "license": "Apache-2.0",
