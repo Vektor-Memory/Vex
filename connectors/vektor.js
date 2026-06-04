@@ -2,7 +2,7 @@ import { createRequire } from 'module';
 import { toRecord }   from '../formats/vmig.js';
 import { progress, summary } from '../utils/progress.js';
 
-// ── Lazy loader — avoids crashing on startup if better-sqlite3 isn't built ──
+// ── Lazy loader ───────────────────────────────────────────────────────────────
 
 let _Database = null;
 async function getDatabase() {
@@ -24,10 +24,6 @@ async function getDatabase() {
 
 const _require = createRequire(import.meta.url);
 
-/**
- * Load sqlite-vec extension into a better-sqlite3 db instance.
- * Returns true if loaded, false if unavailable (non-fatal).
- */
 function loadSqliteVec(db) {
   try {
     const sqliteVec = _require('sqlite-vec');
@@ -38,9 +34,6 @@ function loadSqliteVec(db) {
   }
 }
 
-/**
- * Check memories_vec exists and is queryable.
- */
 function vecAvailable(db) {
   try {
     const row = db.prepare(
@@ -54,10 +47,6 @@ function vecAvailable(db) {
   }
 }
 
-/**
- * Deserialise a stored embedding BLOB → JS number array.
- * Returns null on any error.
- */
 function blobToVector(blob) {
   try {
     if (!blob) return null;
@@ -69,10 +58,6 @@ function blobToVector(blob) {
   }
 }
 
-/**
- * Serialise a JS number array → Float32 Buffer for storage.
- * Returns null if input invalid.
- */
 function vectorToBlob(arr) {
   if (!Array.isArray(arr) || !arr.length) return null;
   return Buffer.from(new Float32Array(arr).buffer);
@@ -88,15 +73,13 @@ export const vektorConnector = {
     const dbPath      = opts['db']        || opts['path'] || 'slipstream-memory.db';
     const namespace   = opts['namespace'] || null;
     const limit       = opts['limit']     ? parseInt(opts['limit']) : null;
-    const queryVecRaw = opts['vec-query'] || null; // JSON float array → ANN export
+    const queryVecRaw = opts['vec-query'] || null;
 
     const Database = await getDatabase();
-    // Normalise Windows backslash paths
     const normPath = dbPath.replace(/\\/g, '/');
     const db     = new Database(normPath, { readonly: true });
     const hasVec = loadSqliteVec(db) && vecAvailable(db);
 
-    // Verify memories table exists and log count
     try {
       const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
       console.log(`[vektor] tables: ${tables.join(', ')}`);
@@ -108,10 +91,8 @@ export const vektorConnector = {
       }
     } catch (e) {
       if (e.message.includes('memories')) throw e;
-      // non-fatal — continue
     }
 
-    // ── ANN-ordered export via sqlite-vec ──────────────────────────────────
     if (queryVecRaw && hasVec) {
       let queryArr;
       try {
@@ -152,12 +133,10 @@ export const vektorConnector = {
       });
     }
 
-    // ── Standard export (existing behaviour) ──────────────────────────────
     if (queryVecRaw && !hasVec) {
       console.warn('[vektor] --vec-query ignored: memories_vec not available. Run scripts/migrate-vec.mjs first.');
     }
 
-    // ── Detect actual column names — schema varies across SDK versions ────────
     const colInfo  = db.prepare('PRAGMA table_info(memories)').all();
     const colNames = colInfo.map(c => c.name);
 
@@ -172,7 +151,6 @@ export const vektorConnector = {
     const hasImportance= colNames.includes('importance');
     const hasTags      = colNames.includes('tags');
 
-    // Build SELECT dynamically from available columns
     const selectCols = [
       'id',
       'content AS text',
@@ -196,7 +174,6 @@ export const vektorConnector = {
     return rows.map(row => {
       let meta = null;
       try { meta = row.metadata ? JSON.parse(row.metadata) : null; } catch {}
-      // Fold importance + tags into metadata for portability
       if (row.importance != null || row.tags) {
         meta = meta || {};
         if (row.importance != null) meta.importance = row.importance;
@@ -214,62 +191,82 @@ export const vektorConnector = {
     const Database = await getDatabase();
     const db = new Database(dbPath);
 
-    // ensure base table exists (same schema as VEKTOR Slipstream)
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS memories (
-        id         TEXT PRIMARY KEY,
-        content    TEXT,
-        embedding  BLOB,
-        metadata   TEXT,
-        created_at TEXT,
-        namespace  TEXT
-      )
-    `);
+    // Detect existing schema — works with both minimal and full VEKTOR schemas
+    const colInfo  = db.prepare('PRAGMA table_info(memories)').all();
+    const colNames = colInfo.map(c => c.name);
+    const idIsInt  = (colInfo.find(c => c.name === 'id')?.type || '').toUpperCase().includes('INT');
 
-    // sqlite-vec — best effort, non-fatal if unavailable or not migrated
-    const hasVec = loadSqliteVec(db) && vecAvailable(db);
-    if (hasVec) {
-      console.log('[vektor] sqlite-vec available — will sync memories_vec on import');
+    const vecCol   = colNames.includes('embedding') ? 'embedding'
+                   : colNames.includes('vector')    ? 'vector'
+                   : 'embedding';
+
+    const hasMeta      = colNames.includes('metadata');
+    const hasNs        = colNames.includes('namespace');
+    const hasCreatedAt = colNames.includes('created_at');
+    const hasImportance= colNames.includes('importance');
+    const hasTags      = colNames.includes('tags');
+    const hasMemType   = colNames.includes('memory_type');
+
+    // Only create the table if it doesn't already exist
+    const tableExists = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='memories'"
+    ).get();
+    if (!tableExists) {
+      db.exec(
+        `CREATE TABLE IF NOT EXISTS memories (` +
+        `id TEXT PRIMARY KEY, content TEXT, ${vecCol} BLOB, ` +
+        `metadata TEXT, created_at TEXT, namespace TEXT)`
+      );
     }
 
-    const insert = db.prepare(`
-      INSERT OR REPLACE INTO memories (id, content, embedding, metadata, created_at, namespace)
-      VALUES (@id, @content, @embedding, @metadata, @created_at, @namespace)
-    `);
+    // sqlite-vec — best effort, non-fatal if unavailable
+    const hasVec = loadSqliteVec(db) && vecAvailable(db);
+    if (hasVec) console.log('[vektor] sqlite-vec available — will sync memories_vec on import');
 
-    // Use subquery to get rowid after insert (vec0 needs rowid, not TEXT id)
+    // Build INSERT dynamically from columns that actually exist in this DB
+    const insertCols = ['content', vecCol];
+    if (!idIsInt)      insertCols.unshift('id');
+    if (hasMeta)       insertCols.push('metadata');
+    if (hasNs)         insertCols.push('namespace');
+    if (hasCreatedAt)  insertCols.push('created_at');
+    if (hasImportance) insertCols.push('importance');
+    if (hasTags)       insertCols.push('tags');
+    if (hasMemType)    insertCols.push('memory_type');
+
+    const placeholders = insertCols.map(c => c === vecCol ? '@vec' : '@' + c).join(', ');
+    const insert = db.prepare(
+      `INSERT INTO memories (${insertCols.join(', ')}) VALUES (${placeholders})`
+    );
+
     const insertVec = hasVec
-      ? db.prepare(`
-          INSERT OR REPLACE INTO memories_vec(rowid, embedding)
-          VALUES ((SELECT rowid FROM memories WHERE id = ?), ?)
-        `)
+      ? db.prepare(
+          `INSERT OR REPLACE INTO memories_vec(rowid, embedding) ` +
+          `VALUES ((SELECT rowid FROM memories WHERE id = ?), ?)`
+        )
       : null;
 
-    let upserted = 0;
-    let skipped  = 0;
-    let vecSynced = 0;
+    let upserted = 0, skipped = 0, vecSynced = 0;
 
     const insertMany = db.transaction(batch => {
       for (const r of batch) {
         try {
           const embBlob = vectorToBlob(r.vector);
-
-          insert.run({
-            id:         String(r.id),
-            content:    r.text        || null,
-            embedding:  embBlob,
-            metadata:   r.metadata    ? JSON.stringify(r.metadata) : null,
-            created_at: r.created_at  || new Date().toISOString(),
-            namespace:  r.namespace   || null,
-          });
+          const meta    = r.metadata || {};
+          const row = {
+            content:     r.text || null,
+            vec:         embBlob,
+            namespace:   r.namespace   || 'claude-conversations',
+            created_at:  r.created_at  || new Date().toISOString(),
+            metadata:    r.metadata    ? JSON.stringify(r.metadata) : null,
+            importance:  typeof meta.importance === 'number' ? meta.importance : 1.0,
+            tags:        meta.tags     || '',
+            memory_type: meta.memory_type || 'episodic',
+          };
+          if (!idIsInt) row.id = String(r.id);
+          insert.run(row);
           upserted++;
-
-          // sync to memories_vec — non-fatal
           if (insertVec && embBlob) {
-            try {
-              insertVec.run(String(r.id), embBlob);
-              vecSynced++;
-            } catch { /* dim mismatch or other — skip silently */ }
+            try { insertVec.run(String(r.id), embBlob); vecSynced++; } catch {}
           }
         } catch (e) {
           skipped++;
@@ -285,18 +282,14 @@ export const vektorConnector = {
     }
 
     db.close();
-
-    if (hasVec) {
-      console.log(`[vektor] memories_vec synced: ${vecSynced}/${upserted}`);
-    }
+    if (hasVec) console.log(`[vektor] memories_vec synced: ${vecSynced}/${upserted}`);
     summary({ connector: 'vektor', total: records.length, upserted, skipped, durationMs: Date.now() - t0 });
     console.log(`[vektor] written to ${dbPath}`);
+    return { upserted, skipped };
   },
 
   // ── STREAMING EXPORT ────────────────────────────────────────────────────────
   async extractStream(opts, onPage) {
-    // SQLite reads are local + fast — load all then page.
-    // For vec-query ANN path this is fine since k is bounded.
     const records = await this.extract(opts);
     const PAGE    = 1000;
     for (let i = 0; i < records.length; i += PAGE) {
@@ -305,7 +298,6 @@ export const vektorConnector = {
   },
 
   // ── DIM DETECTION ───────────────────────────────────────────────────────────
-  // Used by core/migrate.js dimCheck to detect source vector dimensions.
   async getDims(opts) {
     const dbPath = opts['db'] || opts['path'] || 'slipstream-memory.db';
     try {
@@ -319,7 +311,7 @@ export const vektorConnector = {
       db.close();
       if (!row?.vec) return null;
       const buf = Buffer.isBuffer(row.vec) ? row.vec : Buffer.from(row.vec);
-      return buf.byteLength / 4; // Float32 = 4 bytes each
+      return buf.byteLength / 4;
     } catch {
       return null;
     }

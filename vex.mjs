@@ -4,6 +4,7 @@ import { writeMeta, readJsonl, validate }        from './formats/vmig.js';
 import { streamExport, streamImport, migrate as coreMigrate } from './core/migrate.js';
 import { listAdapters }                          from './utils/adapt.js';
 import { signExport, verifyExport }              from './core/sign.js';
+import { getAdapter as getConvertAdapter, listConvertAdapters } from './adapters/convert/index.js';
 import fs                                        from 'fs';
 import readline                                  from 'readline';
 
@@ -38,7 +39,7 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.4.0';
+const VERSION = '0.6.0';
 
 // ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
@@ -84,6 +85,7 @@ function showHelp() {
   row(W('export'),   Sk('vex export')    + Gr('  --from <store>  --output <file.vmig.jsonl>'));
   row(W('import'),   Sk('vex import')    + Gr('  --from <file>   --to <store>'));
   row(W('migrate'),  Sk('vex migrate')   + Gr('  --from <store>  --to <store>'));
+  row(W('convert'),  Sk('vex convert')   + Gr('  --from <file.vmig.jsonl>  --adapter <name>  --output <file>'));
   row(W('sign'),     Sk('vex sign')      + Gr('  <file>  — BLAKE3 + Ed25519 sign export'));
   row(W('verify'),   Sk('vex verify')    + Gr('  <file>  — verify signature (exit 0=ok 1=tampered)'));
   row(W('inspect'),  Sk('vex inspect')   + Gr('  <file>  — show stats, models, namespaces'));
@@ -92,13 +94,26 @@ function showHelp() {
   boxEnd();
 
   box('CONNECTORS');
-  row(G('✓') + ' ' + W('vektor'),   Si('VEKTOR Slipstream SQLite   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('jsonl'),    Si('.vmig.jsonl file           ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('pinecone'), Si('Pinecone                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('qdrant'),   Si('Qdrant                     ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('chroma'),   Si('ChromaDB                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('weaviate'), Si('Weaviate                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('pgvector'), Si('PostgreSQL / pgvector       ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('vektor'),        Si('VEKTOR Slipstream SQLite   ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('jsonl'),         Si('.vmig.jsonl file           ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('pinecone'),      Si('Pinecone                   ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('qdrant'),        Si('Qdrant                     ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('chroma'),        Si('ChromaDB                   ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('weaviate'),      Si('Weaviate                   ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('pgvector'),      Si('PostgreSQL / pgvector       ') + Ic('export · import'));
+  row(G('✓') + ' ' + W('claude-export'), Si('Claude conversation JSON    ') + Ic('export only'));
+  row(G('✓') + ' ' + W('chatgpt-export'),Si('ChatGPT conversation JSON   ') + Ic('export only'));
+  boxEnd();
+
+  box('CONVERT ADAPTERS');
+  row(G('✓') + ' ' + W('openai-finetune'),    Si('OpenAI fine-tuning JSONL     ') + Ic('POST /v1/fine_tuning/jobs'));
+  row(G('✓') + ' ' + W('openai-context'),     Si('OpenAI chat messages JSON    ') + Ic('context injection'));
+  row(G('✓') + ' ' + W('generic-chat'),       Si('Generic {role,content} JSONL ') + Ic('Perplexity · Groq · Mistral · Together'));
+  row(G('✓') + ' ' + W('anthropic-finetune'), Si('Anthropic Messages format     ') + Ic('Messages API / fine-tune'));
+  row(G('✓') + ' ' + W('plain-text'),         Si('Human-readable transcript     ') + Ic('.txt'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('  Aliases: perplexity, groq, mistral, together → generic-chat'));
+  console.log('  ' + BAR + '  ' + Gr('           anthropic → anthropic-finetune  |  txt → plain-text'));
   boxEnd();
 
   box('COMMON FLAGS');
@@ -112,6 +127,30 @@ function showHelp() {
   row(Sk('--adapter'),       G('vec2vec') + Gr(' translate embeddings — no API required'));
   row(Sk('--adapter-model'), Gr('<model>  target model name for --adapter'));
   row(Sk('--embed-model'),   Gr('<model>  model for --reembed (default: text-embedding-3-small)'));
+  boxEnd();
+
+  box('CONVERSATION EXPORT FLAGS  (claude-export · chatgpt-export)');
+  row(Sk('--file'),              Gr('<path>   conversations.json from export'));
+  row(Sk('--chunk-mode'),        Gr('turn | conversation | exchange  (default: turn)'));
+  row(Sk('--sender'),            Gr('both | user | assistant  (default: both)'));
+  row(Sk('--after'),             Gr('<ISO date>  only conversations after this date'));
+  row(Sk('--before'),            Gr('<ISO date>  only conversations before this date'));
+  row(Sk('--limit-convs'),       Gr('<n>      max conversations to process'));
+  row(Sk('--conversation-name'), Gr('<str>    filter by conversation name (substring)'));
+  row(Sk('--embed-url'),         Gr('<url>    custom embedding endpoint (OpenAI-compatible)'));
+  row(Sk('--embed-key'),         Gr('<key>    API key for --embed-url'));
+  boxEnd();
+
+  box('CONVERT FLAGS');
+  row(Sk('--from'),          Gr('<file.vmig.jsonl>  input file'));
+  row(Sk('--adapter'),       Gr('<name>   openai-finetune | openai-context | generic-chat | anthropic-finetune | plain-text'));
+  row(Sk('--output'),        Gr('<file>   output path (extension auto-appended if omitted)'));
+  row(Sk('--system-prompt'), Gr('<text>   prepend system message (openai-* and anthropic-*)'));
+  row(Sk('--max-tokens'),    Gr('<n>      token budget hint for openai-context (approx)'));
+  row(Sk('--conversation-id'), Gr('<id>   filter to single conversation (openai-context)'));
+  row(Sk('--separator'),     Gr('<str>    section separator for plain-text (default: ═×72)'));
+  blank();
+  console.log('  ' + BAR + '  ' + Sk('vex convert --adapter list') + Gr('  — show all adapters'));
   boxEnd();
 
   box('SIGN / VERIFY  (v0.4)');
@@ -173,6 +212,34 @@ function showHelp() {
   console.log('  ' + BAR + '  ' + Gr('# Export VEKTOR memory'));
   console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --output memories.vmig.jsonl');
   blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export ChatGPT conversations → vmig'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from chatgpt-export --file conversations.json --output chatgpt.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Migrate ChatGPT conversations directly into VEKTOR DB'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from chatgpt-export --to vektor --file conversations.json --db memory.db');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export Claude conversations → vmig'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from claude-export --file conversations.json --output claude.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Migrate Claude conversations directly into VEKTOR DB'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json --db memory.db');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Convert to OpenAI fine-tuning format'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter openai-finetune --output finetune.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Convert to Perplexity / Groq / Mistral / Together (generic chat)'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter generic-chat --output chat.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Convert to Anthropic Messages API format'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter anthropic-finetune --output anthropic.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Convert to plain text transcript'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter plain-text --output transcripts.txt');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export with chunking + embedding'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from claude-export --file conversations.json --output out.vmig.jsonl \\');
+  console.log('  ' + BAR + '  ' + Gr('             --chunk-mode exchange --sender both --openai-key $KEY --namespace claude'));
+  blank();
   console.log('  ' + BAR + '  ' + Gr('# Export working + procedural memories only (PAM five-component model)'));
   console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --components working,procedural --output state.vmig.jsonl');
   blank();
@@ -199,6 +266,9 @@ function showHelp() {
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Inspect a file'));
   console.log('  ' + BAR + '  ' + Sk('vex inspect') + ' memories.vmig.jsonl');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# List all convert adapters'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --adapter list');
   blank();
   boxEnd();
 }
@@ -292,7 +362,7 @@ async function cmdValidate(file) {
   if (errors) process.exit(1);
 }
 
-// ── ADAPTERS ───────────────────────────────────────────────────────────────
+// ── ADAPTERS (vec2vec) ─────────────────────────────────────────────────────
 async function cmdAdapters() {
   banner();
   box('VEX-ADAPTER  PROJECTION PAIRS');
@@ -379,7 +449,6 @@ async function cmdExport(flags) {
   const connector = getConnector(flags.from);
 
   // ── --components filter (PAM five-component selective disclosure) ────────
-  // Parse: --components working,procedural  → filters records by memory_type
   if (flags.components) {
     const allowed = new Set(
       String(flags.components).toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
@@ -392,26 +461,26 @@ async function cmdExport(flags) {
         process.exit(1);
       }
     }
-    // Inject filter into flags so streamExport / vektor connector can use it
     flags._componentFilter = allowed;
     console.log('  ' + G('→') + '  Component filter: ' + Ic([...allowed].join(', ')));
   }
 
   banner();
-  const nsLabel    = flags.namespace  ? Gr(` [ns: ${flags.namespace}]`)           : '';
-  const limLabel   = flags.limit      ? Gr(` [limit: ${flags.limit}]`)             : '';
-  const compLabel  = flags.components ? Y(`  [components: ${flags.components}]`)   : '';
-  console.log('  ' + G('→') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + compLabel + '\n');
+  const nsLabel    = flags.namespace  ? Gr(` [ns: ${flags.namespace}]`)         : '';
+  const limLabel   = flags.limit      ? Gr(` [limit: ${flags.limit}]`)           : '';
+  const compLabel  = flags.components ? Y(`  [components: ${flags.components}]`) : '';
+  const chunkLabel = flags['chunk-mode'] ? Gr(` [chunk: ${flags['chunk-mode']}]`) : '';
+  console.log('  ' + G('→') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + compLabel + chunkLabel + '\n');
 
   let total = await streamExport(connector, flags, outPath);
 
-  // ── Post-export component filter (applied after stream if connector doesn't support it natively) ──
+  // ── Post-export component filter ─────────────────────────────────────────
   if (flags._componentFilter) {
-    const allowed = flags._componentFilter;
-    const raw     = fs.readFileSync(outPath, 'utf8').split('\n').filter(l => l.trim());
+    const allowed  = flags._componentFilter;
+    const raw      = fs.readFileSync(outPath, 'utf8').split('\n').filter(l => l.trim());
     const filtered = raw.filter(line => {
       try {
-        const r = JSON.parse(line);
+        const r  = JSON.parse(line);
         const mt = (r.metadata?.memory_type || r.memory_type || 'semantic').toLowerCase();
         return allowed.has(mt);
       } catch { return false; }
@@ -429,7 +498,7 @@ async function cmdExport(flags) {
 
   console.log('\n  ' + G('✓') + '  ' + W(String(total)) + ' records exported → ' + Gr(outPath) + '\n');
 
-  // ── Auto-sign if --sign flag present ────────────────────────────────────
+  // ── Auto-sign ─────────────────────────────────────────────────────────────
   if (flags.sign) {
     console.log('  ' + G('→') + '  Auto-signing...\n');
     try {
@@ -476,11 +545,78 @@ async function cmdMigrate(flags) {
 
   banner();
   const adapterLabel = flags.adapter ? G('  [vec2vec adapter]') : flags.reembed ? Y('  [reembed]') : '';
-  console.log('  ' + G('→') + '  Migrating ' + Ic(flags.from) + ' → ' + Ic(flags.to) + adapterLabel + '\n');
+  const chunkLabel   = flags['chunk-mode'] ? Gr(`  [chunk: ${flags['chunk-mode']}]`) : '';
+  console.log('  ' + G('→') + '  Migrating ' + Ic(flags.from) + ' → ' + Ic(flags.to) + adapterLabel + chunkLabel + '\n');
 
   const { total, upserted } = await coreMigrate(fromConnector, toConnector, flags);
 
   console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + '/' + String(total) + ' records migrated\n');
+}
+
+// ── CONVERT ────────────────────────────────────────────────────────────────
+async function cmdConvert(flags) {
+  if (!flags.adapter) { console.error(R('\n  ✗  --adapter required (try --adapter list)')); process.exit(1); }
+
+  // ── list mode — no --from or --output needed ──────────────────────────────
+  if (flags.adapter === 'list') {
+    banner();
+    box('CONVERT ADAPTERS');
+    const adapters = listConvertAdapters();
+    for (const a of adapters) {
+      const nameCol = W(a.name.padEnd(22));
+      const extCol  = Ic(`.${a.ext}  `);
+      const descCol = Gr(a.description.length > 58 ? a.description.slice(0, 55) + '…' : a.description);
+      row(nameCol, extCol + descCol);
+    }
+    blank();
+    console.log('  ' + BAR + '  ' + Gr('Aliases: perplexity / groq / mistral / together → generic-chat'));
+    console.log('  ' + BAR + '  ' + Gr('         anthropic → anthropic-finetune  |  txt → plain-text'));
+    boxEnd();
+    return;
+  }
+
+  if (!flags.from)               { console.error(R('\n  ✗  --from required'));    process.exit(1); }
+  if (!flags.output && !flags.o) { console.error(R('\n  ✗  --output required')); process.exit(1); }
+
+  if (!fs.existsSync(flags.from)) {
+    console.error(R(`\n  ✗  File not found: ${flags.from}`)); process.exit(1);
+  }
+
+  let adapter;
+  try {
+    adapter = getConvertAdapter(flags.adapter);
+  } catch (e) {
+    console.error(R(`\n  ✗  ${e.message}`));
+    console.log('  Run ' + Sk('vex convert --adapter list') + ' to see available adapters.\n');
+    process.exit(1);
+  }
+
+  banner();
+  console.log('  ' + G('→') + '  Converting ' + Gr(flags.from) + ' → ' + Ic(adapter.name) + '\n');
+
+  const records = await readJsonl(flags.from);
+  if (!records.length) {
+    console.error(Y('\n  ⚠  Input file is empty')); process.exit(1);
+  }
+
+  box('CONVERT');
+  row(Si('records'),    W(String(records.length)));
+  row(Si('adapter'),    Ic(adapter.name));
+  row(Si('output ext'), Gr('.' + adapter.fileExtension));
+  if (flags['system-prompt']) row(Si('system prompt'), Gr(flags['system-prompt'].slice(0, 50) + (flags['system-prompt'].length > 50 ? '…' : '')));
+  if (flags['chunk-mode'])    row(Si('chunk mode'),    Gr(flags['chunk-mode']));
+  boxEnd();
+
+  const output = adapter.convert(records, flags);
+
+  // Auto-append extension if outPath has none
+  const outPath   = flags.output || flags.o;
+  const finalPath = outPath.includes('.') ? outPath : `${outPath}.${adapter.fileExtension}`;
+
+  fs.writeFileSync(finalPath, output, 'utf8');
+
+  const lineCount = output.trim().split('\n').filter(Boolean).length;
+  console.log('  ' + G('✓') + '  ' + W(String(lineCount)) + ' lines written → ' + Gr(finalPath) + '\n');
 }
 
 // ── INTERACTIVE MENU ───────────────────────────────────────────────────────
@@ -492,11 +628,12 @@ async function interactiveMenu() {
     ['1', 'export',   'Export memory → .vmig.jsonl'],
     ['2', 'import',   'Import .vmig.jsonl → any store'],
     ['3', 'migrate',  'Migrate directly between stores'],
-    ['4', 'sign',     'Sign export (BLAKE3 + Ed25519)'],
-    ['5', 'verify',   'Verify signature'],
-    ['6', 'inspect',  'Inspect a .vmig.jsonl file'],
-    ['7', 'validate', 'Validate a .vmig.jsonl file'],
-    ['8', 'adapters', 'List vec2vec projection pairs'],
+    ['4', 'convert',  'Convert .vmig.jsonl → LLM provider format'],
+    ['5', 'sign',     'Sign export (BLAKE3 + Ed25519)'],
+    ['6', 'verify',   'Verify signature'],
+    ['7', 'inspect',  'Inspect a .vmig.jsonl file'],
+    ['8', 'validate', 'Validate a .vmig.jsonl file'],
+    ['9', 'adapters', 'List vec2vec projection pairs'],
     ['h', 'help',     'Full help'],
     ['q', 'quit',     ''],
   ];
@@ -510,8 +647,11 @@ async function interactiveMenu() {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   rl.question('  ' + Sk('→') + '  ', answer => {
     rl.close();
-    const map = { '1':'export','2':'import','3':'migrate','4':'sign','5':'verify','6':'inspect','7':'validate','8':'adapters' };
-    const ch  = answer.trim().toLowerCase();
+    const map = {
+      '1':'export','2':'import','3':'migrate','4':'convert',
+      '5':'sign','6':'verify','7':'inspect','8':'validate','9':'adapters',
+    };
+    const ch = answer.trim().toLowerCase();
     console.log('');
     if (ch === 'h') { showHelp(); return; }
     if (ch === 'q' || !ch) process.exit(0);
@@ -540,17 +680,18 @@ const cmd   = args[0];
 const flags = parseFlags(args);
 
 try {
-  if (!cmd)                                 { await interactiveMenu();                                    }
-  else if (['--help','-h','help'].includes(cmd)) { showHelp();                                            }
-  else if (['--version','-v'].includes(cmd))     { console.log(`vex v${VERSION}`);                       }
-  else if (cmd === 'sign')                       { await cmdSign(args[1] || flags.file || flags.from, flags); }
-  else if (cmd === 'verify')                     { await cmdVerify(args[1] || flags.file || flags.from, flags); }
-  else if (cmd === 'inspect')                    { await cmdInspect(args[1] || flags.file || flags.from); }
-  else if (cmd === 'validate')                   { await cmdValidate(args[1] || flags.file || flags.from);}
-  else if (cmd === 'adapters')                   { await cmdAdapters();                                   }
-  else if (cmd === 'export')                     { await cmdExport(flags);                                }
-  else if (cmd === 'import')                     { await cmdImport(flags);                                }
-  else if (cmd === 'migrate')                    { await cmdMigrate(flags);                               }
+  if (!cmd)                                      { await interactiveMenu();                                         }
+  else if (['--help','-h','help'].includes(cmd)) { showHelp();                                                      }
+  else if (['--version','-v'].includes(cmd))     { console.log(`vex v${VERSION}`);                                  }
+  else if (cmd === 'sign')                       { await cmdSign(args[1] || flags.file || flags.from, flags);       }
+  else if (cmd === 'verify')                     { await cmdVerify(args[1] || flags.file || flags.from, flags);     }
+  else if (cmd === 'inspect')                    { await cmdInspect(args[1] || flags.file || flags.from);           }
+  else if (cmd === 'validate')                   { await cmdValidate(args[1] || flags.file || flags.from);          }
+  else if (cmd === 'adapters')                   { await cmdAdapters();                                             }
+  else if (cmd === 'export')                     { await cmdExport(flags);                                          }
+  else if (cmd === 'import')                     { await cmdImport(flags);                                          }
+  else if (cmd === 'migrate')                    { await cmdMigrate(flags);                                         }
+  else if (cmd === 'convert')                    { await cmdConvert(flags);                                         }
   else {
     console.error(R(`\n  ✗  Unknown command: ${cmd}`));
     console.log('  Run ' + Sk('vex --help') + ' to see available commands.\n');
