@@ -27,6 +27,28 @@ Every vector DB has a different API, a different format, and zero interop. Every
 `vex` fixes that with a single open format, a growing connector library, and a set of format adapters that turn your conversation history into whatever shape any LLM provider needs. Your memory is always exportable, always portable, always verifiable, always yours.
 
 ---
+## What's new in v0.7.0
+
+**`--max-chars` for conversation chunking**
+Long conversations are now split into recall-sized chunks instead of one giant record. Pass `--max-chars 20000` with `--chunk-mode conversation` and vex splits at `---` turn boundaries, emitting `conv-id:p2`, `conv-id:p3` overflow records with `part`/`total_parts` in metadata. Without the flag, behaviour is unchanged.
+
+```bash
+vex migrate --from claude-export --to vektor \
+  --file conversations.json \
+  --db memory.db \
+  --namespace claude-history \
+  --chunk-mode conversation \
+  --max-chars 20000
+```
+
+**Accurate import counters**
+The summary line now shows real numbers — `42 new records written (109 duplicate/skipped) / 151 total` — instead of always reporting `0/N`. The vektor connector tracks actual row deltas via `COUNT(*)` before/after each batch and returns `{ upserted, skipped }` as the authoritative count.
+
+**FTS5 trigger compatibility**
+Importing into a Slipstream DB (v1.5+ schema) no longer throws `datatype mismatch`. The FTS insert trigger is suspended for the bulk write and restored after, handling the TEXT UUID rowid constraint cleanly.
+
+**Portable sqlite path resolution**
+The hardcoded `C:/Users/minimaxa/...` path in the vektor connector is gone. The bundled `better-sqlite3` is now resolved dynamically from `APPDATA`, falling back to any globally installed copy.
 
 # What's New in v0.6.2
 ### Added
