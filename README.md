@@ -7,7 +7,8 @@ https://medium.com/ai-in-plain-english/your-agent-memory-is-trapped-heres-the-ke
 
 
 
-<img width="1049" height="462" alt="image" src="https://github.com/user-attachments/assets/ad83d20d-da82-482a-aa3c-007e35226088" />
+<img width="1073" height="467" alt="image" src="https://github.com/user-attachments/assets/8ac8b77a-289b-4dbd-a75b-239f14942498" />
+
 
 
 ```bash
