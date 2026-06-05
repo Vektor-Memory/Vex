@@ -90,6 +90,12 @@ Requirements: Node.js >= 18. No extra dependencies for Pinecone, Qdrant, Chroma,
 
 ---
 
+## [0.6.1] - 2026-06-05
+
+### Fixed
+- vektor connector: FTS5 triggers with TEXT id as rowid caused datatype mismatch on import into Slipstream DBs with v1.5+ schema. Triggers suspended before bulk import and rebuilt after.
+- vektor connector: created_at normalised to unix timestamp when target schema uses NUM column.
+
 # Commands
 
 ## Conversation Export (v0.6.1)
