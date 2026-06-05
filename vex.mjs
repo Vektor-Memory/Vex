@@ -39,7 +39,7 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 
 // ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
