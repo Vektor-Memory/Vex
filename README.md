@@ -1,4 +1,4 @@
-# Vex — Vector Exchange v0.6.2
+# Vex — Vector Exchange v0.7.0
 
 > Cross-standard vector DB migration tool with cryptographic memory portability. Export, sign, verify, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
@@ -7,7 +7,8 @@ https://medium.com/ai-in-plain-english/your-agent-memory-is-trapped-heres-the-ke
 
 
 
-<img width="1073" height="467" alt="image" src="https://github.com/user-attachments/assets/8ac8b77a-289b-4dbd-a75b-239f14942498" />
+<img width="1003" height="480" alt="image" src="https://github.com/user-attachments/assets/820f9957-166c-4ac2-8682-19dd1f124e3d" />
+
 
 
 
