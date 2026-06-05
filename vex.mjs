@@ -39,7 +39,7 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.6.2';
+const VERSION = '0.7.0';
 
 // ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
@@ -550,7 +550,8 @@ async function cmdMigrate(flags) {
 
   const { total, upserted } = await coreMigrate(fromConnector, toConnector, flags);
 
-  console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + '/' + String(total) + ' records migrated\n');
+  const _skStr = skipped > 0 ? ' (' + skipped + ' duplicate/skipped)' : '';
+  console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + ' new records written' + _skStr + ' / ' + String(total) + ' total\n');
 }
 
 // ── CONVERT ────────────────────────────────────────────────────────────────
