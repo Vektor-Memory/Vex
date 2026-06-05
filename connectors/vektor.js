@@ -222,6 +222,12 @@ export const vektorConnector = {
     // sqlite-vec — best effort, non-fatal if unavailable
     const hasVec = loadSqliteVec(db) && vecAvailable(db);
     if (hasVec) console.log('[vektor] sqlite-vec available — will sync memories_vec on import');
+    // Suspend FTS triggers that use TEXT id as rowid (causes datatype mismatch)
+    const ftsTriggers = db.prepare(
+      "SELECT name, sql FROM sqlite_master WHERE type='trigger' AND tbl_name='memories' AND sql LIKE '%memories_fts%'"
+    ).all();
+    for (const t of ftsTriggers) db.exec(`DROP TRIGGER IF EXISTS "${t.name}"`);
+
 
     // Build INSERT dynamically from columns that actually exist in this DB
     const insertCols = ['content', vecCol];
@@ -256,7 +262,7 @@ export const vektorConnector = {
             content:     r.text || null,
             vec:         embBlob,
             namespace:   r.namespace   || 'claude-conversations',
-            created_at:  r.created_at  || new Date().toISOString(),
+            created_at:  r.created_at ? (typeof r.created_at === 'string' ? Math.floor(new Date(r.created_at).getTime()/1000) : r.created_at) : Math.floor(Date.now()/1000),
             metadata:    r.metadata    ? JSON.stringify(r.metadata) : null,
             importance:  typeof meta.importance === 'number' ? meta.importance : 1.0,
             tags:        meta.tags     || '',
@@ -281,6 +287,15 @@ export const vektorConnector = {
       progress(Math.min(i + BATCH, records.length), records.length, 'vektor import');
     }
 
+
+    // Rebuild FTS index and restore triggers
+    try {
+      if (ftsTriggers.length) {
+        db.exec('INSERT INTO memories_fts(memories_fts) VALUES(\'rebuild\')');
+        for (const t of ftsTriggers) db.exec(t.sql);
+        console.log(`[vektor] FTS rebuilt, ${ftsTriggers.length} trigger(s) restored`);
+      }
+    } catch (e) { console.warn('[vektor] FTS rebuild warning:', e.message); }
     db.close();
     if (hasVec) console.log(`[vektor] memories_vec synced: ${vecSynced}/${upserted}`);
     summary({ connector: 'vektor', total: records.length, upserted, skipped, durationMs: Date.now() - t0 });
