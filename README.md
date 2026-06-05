@@ -1,4 +1,4 @@
-# Vex — Vector Exchange v0.6.0
+# Vex — Vector Exchange v0.6.1
 
 > Cross-standard vector DB migration tool with cryptographic memory portability. Export, sign, verify, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
@@ -29,7 +29,7 @@ Every vector DB has a different API, a different format, and zero interop. Every
 
 ---
 
-# What's New in v0.6.0
+# What's New in v0.6.1
 
 **Conversation portability.** Import your entire Claude or ChatGPT history into any vector DB in one command. Convert it to OpenAI fine-tuning format, Anthropic Messages API, Groq, Perplexity, Mistral, or plain text. Your conversations are now first-class agent memory.
 
@@ -92,7 +92,7 @@ Requirements: Node.js >= 18. No extra dependencies for Pinecone, Qdrant, Chroma,
 
 # Commands
 
-## Conversation Export (v0.6.0)
+## Conversation Export (v0.6.1)
 
 ```bash
 # Claude — export from claude.ai Settings → Privacy → Export Data
@@ -119,7 +119,7 @@ vex export --from claude-export --file conversations.json --output out.vmig.json
 #   exchange     — one record per user+assistant pair (best for fine-tuning)
 ```
 
-## Convert — LLM Provider Formats (v0.6.0)
+## Convert — LLM Provider Formats (v0.6.1)
 
 ```bash
 # List all adapters
@@ -327,7 +327,7 @@ vex verify memories.vmig.jsonl
 
 **v0.5.0 — shipped** · `claude-export` connector, `vex convert` command, 5 LLM format adapters
 
-**v0.6.0 — shipped** · `chatgpt-export` connector, schema-adaptive vektor `load()`, accurate import counters
+**v0.6.1 — shipped** · `chatgpt-export` connector, schema-adaptive vektor `load()`, accurate import counters
 
 **v0.7 — next**
 - Gemini export connector
