@@ -1,4 +1,4 @@
-# Vex — Vector Exchange v0.6.1
+# Vex — Vector Exchange v0.6.2
 
 > Cross-standard vector DB migration tool with cryptographic memory portability. Export, sign, verify, and migrate agent memory between vector stores using the open `.vmig.jsonl` interchange format.
 
@@ -26,10 +26,13 @@ Every vector DB has a different API, a different format, and zero interop. Every
 
 ---
 
-# What's New in v0.6.1
+# What's New in v0.6.2
+### Added
+- **`core/graph-builder.js`** — post-import MAGMA graph engine. After any `vex load --to vektor`, the builder automatically reconstructs three structural edge layers from flat imported records: `temporal` (chronological chain within a configurable time window), `tag:*` (nodes sharing a tag, 2–50 member groups only), and `causal` (supersession edges detected from content patterns). All writes use INSERT OR IGNORE so re-runs are safe. Exposed as `buildGraph(db, rows, opts)` for direct use by any connector writing to a Slipstream DB.
+- **`vektor` connector `load()`** — full write implementation replacing the v0.1 stub. Writes memory rows with correct `agent_id` (from `--agent-id` flag or `VEKTOR_AGENT_ID` env), `namespace`, `created_at`, and Float32 vector blobs. Batched transactions with progress output. Calls `buildGraph()` automatically unless `--skip-graph` is passed. Resolves `better-sqlite3` from the vektor-slipstream bundled path first, then falls back to global install.
+- **Retroactive graph backfill** — running `vex graph-build --db <path>` (or the graph builder directly) against an existing DB will generate edges for all rows including pre-existing vex imports that had none.
 
 **Conversation portability.** Import your entire Claude or ChatGPT history into any vector DB in one command. Convert it to OpenAI fine-tuning format, Anthropic Messages API, Groq, Perplexity, Mistral, or plain text. Your conversations are now first-class agent memory.
-
 - **`claude-export` connector** — import from the official claude.ai data export. Handles both claude.ai and API shapes. Three chunking modes: `turn`, `conversation`, `exchange`.
 - **`chatgpt-export` connector** — import from the official ChatGPT data export. Reconstructs the active conversation thread from ChatGPT's tree-structured mapping format.
 - **`vex convert` command** — transform `.vmig.jsonl` into provider-specific formats for fine-tuning or context injection. Five adapters: `openai-finetune`, `openai-context`, `generic-chat`, `anthropic-finetune`, `plain-text`.
