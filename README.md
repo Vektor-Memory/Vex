@@ -1,4 +1,4 @@
-# VEX — Vector Exchange
+# VEX — Vector Exchange - v0.8.4
 
 **Cross-standard vector DB migration and memory portability for AI agents.**
 
