@@ -5,6 +5,7 @@ import { streamExport, streamImport, migrate as coreMigrate } from './core/migra
 import { listAdapters }                          from './utils/adapt.js';
 import { signExport, verifyExport }              from './core/sign.js';
 import { getAdapter as getConvertAdapter, listConvertAdapters } from './adapters/convert/index.js';
+import { runPipeline }                          from './pipeline/index.js';
 import fs                                        from 'fs';
 import readline                                  from 'readline';
 
@@ -39,7 +40,7 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.1';
 
 // ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
@@ -131,14 +132,55 @@ function showHelp() {
 
   box('CONVERSATION EXPORT FLAGS  (claude-export · chatgpt-export)');
   row(Sk('--file'),              Gr('<path>   conversations.json from export'));
-  row(Sk('--chunk-mode'),        Gr('turn | conversation | exchange  (default: turn)'));
+  row(Sk('--mode'),              G('★') + Gr('  raw | extract | smart  (default: raw)'));
+  row(Sk('--chunk-mode'),        Gr('turn | conversation | exchange  (default: conversation)'));
   row(Sk('--sender'),            Gr('both | user | assistant  (default: both)'));
+  row(Sk('--max-chars'),         Gr('<n>      split long conversations at N chars'));
   row(Sk('--after'),             Gr('<ISO date>  only conversations after this date'));
   row(Sk('--before'),            Gr('<ISO date>  only conversations before this date'));
   row(Sk('--limit-convs'),       Gr('<n>      max conversations to process'));
   row(Sk('--conversation-name'), Gr('<str>    filter by conversation name (substring)'));
   row(Sk('--embed-url'),         Gr('<url>    custom embedding endpoint (OpenAI-compatible)'));
   row(Sk('--embed-key'),         Gr('<key>    API key for --embed-url'));
+  boxEnd();
+
+  box('EXTRACTION FLAGS  (--mode extract | smart)');
+  row(Sk('--provider'),          G('auto') + Gr(' auto|groq,ollama,openai  — cascade order (default: auto)'));
+  row(Sk('--groq-key'),          G('free') + Gr('  key1,key2,key3  — Groq keys rotated round-robin'));
+  row(Sk('--openai-key'),        Gr('<key>    OpenAI API key  — gpt-4o-mini'));
+  row(Sk('--anthropic-key'),     Gr('<key>    Anthropic API key  — claude-haiku'));
+  row(Sk('--mistral-key'),       Gr('<key>    Mistral API key  — mistral-small'));
+  row(Sk('--together-key'),      Gr('<key>    Together.ai key  — Llama-3.2-3B'));
+  row(Sk('--ollama-url'),        Gr('<url>    Ollama URL  — local, unlimited, free'));
+  row(Sk('--ollama-draft'),      G('fast') + Gr(' <model>  spec decoding draft model (2-4x speed)'));
+  row(Sk('--extract-url'),       Gr('<url>    Custom OpenAI-compatible endpoint'));
+  row(Sk('--extract-model'),     Gr('<model>  groq:llama-3.3-70b,ollama:mistral or global'));
+  row(Sk('--extract-key'),       Gr('<key>    API key for --extract-url'));
+  row(Sk('--min-importance'),    Gr('<0-1>    Importance filter threshold (default: 0.5)'));
+  row(Sk('--concurrency'),       Gr('<n>      Parallel LLM calls (default: 3, use 1 for free Groq)'));
+  row(Sk('--rate-limit'),        Gr('<ms>     Fixed delay between batches (overrides adaptive)'));
+  row(Sk('--dry-run'),           Y('preview') + Gr(' Show extracted facts without storing'));
+  boxEnd();
+
+  box('PROVIDER CASCADE  (--mode extract)');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Auto-chain from vektor config (reads all configured keys)'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file convs.json --db mem.db \\');
+  console.log('  ' + BAR + '  ' + Gr('             --mode extract --provider auto'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Explicit cascade: Groq first, fall to Ollama if rate-limited'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' ... --provider groq,ollama --groq-key $KEY --ollama-url http://localhost:11434');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Key rotation: 3 Groq keys (triples effective TPM budget)'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' ... --provider groq --groq-key $KEY1,$KEY2,$KEY3');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Spec decoding: Ollama draft model for 2-4x speed'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' ... --provider ollama --ollama-url http://localhost:11434 \\');
+  console.log('  ' + BAR + '  ' + Gr('             --ollama-draft llama3.2 --extract-model llama3.1'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Override model per provider'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' ... --extract-model groq:llama-3.3-70b-versatile,ollama:mistral');
+  blank();
   boxEnd();
 
   box('CONVERT FLAGS');
@@ -254,6 +296,18 @@ function showHelp() {
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Import with vec2vec projection (no re-embedding API needed)'));
   console.log('  ' + BAR + '  ' + Sk('vex import') + ' --from memories.vmig.jsonl --to qdrant --collection mem --adapter --adapter-model text-embedding-3-small');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# RECOMMENDED: Migrate Claude conversations with LLM fact extraction (Groq free tier)'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
+  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode extract --groq-key $GROQ_KEY --namespace my-history'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Smart mode: exchange chunks for short convs, extraction for all'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
+  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode smart --groq-key $GROQ_KEY'));
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Dry run: preview extracted facts without writing to DB'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
+  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode extract --groq-key $GROQ_KEY --dry-run'));
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Migrate Qdrant → VEKTOR'));
   console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from qdrant --to vektor --collection memories --db memory.db');
@@ -542,14 +596,59 @@ async function cmdMigrate(flags) {
 
   const fromConnector = getConnector(flags.from);
   const toConnector   = getConnector(flags.to);
+  const mode          = flags.mode || 'raw';
+
+  // ── Pipeline mode: conversation exports with LLM extraction ────────────
+  const isPipelineSource = ['claude-export','chatgpt-export'].includes(flags.from);
+  const usePipeline      = isPipelineSource && (mode !== 'raw' || flags['dry-run']);
 
   banner();
+  const modeLabel    = Gr(`  [mode: ${mode}]`);
   const adapterLabel = flags.adapter ? G('  [vec2vec adapter]') : flags.reembed ? Y('  [reembed]') : '';
   const chunkLabel   = flags['chunk-mode'] ? Gr(`  [chunk: ${flags['chunk-mode']}]`) : '';
-  console.log('  ' + G('→') + '  Migrating ' + Ic(flags.from) + ' → ' + Ic(flags.to) + adapterLabel + chunkLabel + '\n');
+  console.log('  ' + G('→') + '  Migrating ' + Ic(flags.from) + ' → ' + Ic(flags.to) + modeLabel + adapterLabel + chunkLabel + '\n');
 
-  const { total, upserted } = await coreMigrate(fromConnector, toConnector, flags);
+  if (isPipelineSource) {
+    // Re-parse the original conversations from the file
+    const filePath = flags.file || flags.from;
+    if (!fs.existsSync(filePath)) throw new Error('--file <conversations.json> required');
+    const raw  = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.conversations) ? raw.conversations : []);
 
+    // Normalise to pipeline conversation format
+    const conversations = list.map(conv => {
+      const msgs = (conv.chat_messages || conv.messages || []).map(m => ({
+        id:   m.uuid || m.id || crypto.randomUUID(),
+        role: (m.sender === 'human' || m.role === 'user') ? 'user' : 'assistant',
+        text: typeof m.text === 'string' ? m.text : (typeof m.content === 'string' ? m.content : (Array.isArray(m.content) ? m.content.filter(b=>b.type==='text').map(b=>b.text).join('\n') : '')),
+        created_at: m.created_at || null,
+      })).filter(m => m.text && m.text.trim());
+      return {
+        id:         conv.uuid || conv.id || crypto.randomUUID(),
+        name:       conv.name || conv.title || 'Untitled',
+        created_at: conv.created_at || conv.updated_at || null,
+        messages:   msgs,
+      };
+    });
+
+    // Apply limit-convs filter before pipeline
+    const limitConvs = flags['limit-convs'] ? parseInt(flags['limit-convs']) : null;
+    const pipelineConvs = limitConvs ? conversations.slice(0, limitConvs) : conversations;
+    process.stdout.write('[pipeline] processing ' + pipelineConvs.length + ' conversations' + (limitConvs ? ' (limited from ' + conversations.length + ')' : '') + '\n');
+    const result = await runPipeline(pipelineConvs, toConnector, { ...flags, mode });
+
+    if (result.dryRun) {
+      console.log('\n  ' + Y('⚠  DRY RUN') + '  ' + W(String(result.facts)) + ' facts would be extracted, ' + W(String(result.edges)) + ' edges\n');
+    } else {
+      console.log('\n  ' + G('✓') + '  ' + W(String(result.upserted)) + ' facts stored' +
+        (result.skipped ? '  ' + Y(`${result.skipped} skipped`) : '') +
+        '  ' + Gr(`${result.edges} edges`) + '\n');
+    }
+    return;
+  }
+
+  // ── Standard migrate (non-conversation sources) ─────────────────────────
+  const { total, upserted, skipped } = await coreMigrate(fromConnector, toConnector, flags);
   const _skStr = skipped > 0 ? ' (' + skipped + ' duplicate/skipped)' : '';
   console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + ' new records written' + _skStr + ' / ' + String(total) + ' total\n');
 }
@@ -664,7 +763,7 @@ async function interactiveMenu() {
 // ── FLAG PARSER ────────────────────────────────────────────────────────────
 function parseFlags(argv) {
   const flags = {};
-  for (let i = 1; i < argv.length; i++) {
+  for (let i = 0; i < argv.length; i++) {
     if (argv[i].startsWith('--')) {
       const key  = argv[i].slice(2);
       const next = argv[i + 1];

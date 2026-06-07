@@ -1,7 +1,7 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.7.0",
-  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory. Import Claude and ChatGPT conversations. Convert to OpenAI, Anthropic, Groq, Perplexity, Mistral formats.",
+  "version": "0.8.2",
+  "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory. Import Claude and ChatGPT conversations with LLM fact extraction. Migrate between Pinecone, Qdrant, Chroma, Weaviate, pgvector, Redis, Milvus, Neo4j, VEKTOR. Convert to OpenAI, Anthropic, Groq, Mistral formats.",
   "type": "module",
   "bin": {
     "vex": "./vex.mjs"
@@ -11,7 +11,11 @@
     ".": "./vex.mjs",
     "./adapters/langchain": "./adapters/langchain.js",
     "./adapters/convert": "./adapters/convert/index.js",
-    "./core/sign": "./core/sign.js"
+    "./core/sign": "./core/sign.js",
+    "./connectors/redis": "./connectors/redis.js",
+    "./connectors/milvus": "./connectors/milvus.js",
+    "./connectors/neo4j": "./connectors/neo4j.js",
+    "./connectors/pgvector": "./connectors/pgvector.js"
   },
   "files": [
     "vex.mjs",
@@ -21,42 +25,49 @@
     "core/",
     "adapters/",
     "scripts/",
+    "pipeline/",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "SECURITY.md"
+    "SECURITY.md",
+    "SPEC.md"
   ],
   "keywords": [
     "vector",
     "database",
     "migration",
     "embeddings",
+    "agent-memory",
+    "memory-portability",
+    "vmig",
     "pinecone",
     "qdrant",
-    "vektor",
-    "agent-memory",
+    "chroma",
     "weaviate",
     "pgvector",
-    "chroma",
-    "cli",
-    "vmig",
+    "redis",
+    "milvus",
+    "neo4j",
+    "vektor",
     "langchain",
-    "memory-portability",
-    "blake3",
-    "ed25519",
     "claude",
     "chatgpt",
     "conversation-export",
     "llm-portability",
     "openai",
-    "fine-tuning",
     "anthropic",
     "groq",
-    "perplexity"
+    "perplexity",
+    "fine-tuning",
+    "blake3",
+    "ed25519",
+    "cli",
+    "crewai",
+    "n8n"
   ],
   "author": "Vektor Memory <hello@vektormemory.com>",
   "license": "Apache-2.0",
-  "homepage": "https://github.com/vektor-memory/vex",
+  "homepage": "https://vektormemory.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/vektor-memory/vex"
@@ -82,7 +93,11 @@
   "peerDependencies": {
     "@langchain/core": ">=0.2.0",
     "sqlite-vec": ">=0.1.0",
-    "vektor-slipstream": ">=1.6.0"
+    "vektor-slipstream": ">=1.6.0",
+    "redis": ">=4.0.0",
+    "@zilliz/milvus2-sdk-node": ">=2.0.0",
+    "neo4j-driver": ">=5.0.0",
+    "pg": ">=8.0.0"
   },
   "peerDependenciesMeta": {
     "sqlite-vec": {
@@ -92,6 +107,18 @@
       "optional": true
     },
     "vektor-slipstream": {
+      "optional": true
+    },
+    "redis": {
+      "optional": true
+    },
+    "@zilliz/milvus2-sdk-node": {
+      "optional": true
+    },
+    "neo4j-driver": {
+      "optional": true
+    },
+    "pg": {
       "optional": true
     }
   }

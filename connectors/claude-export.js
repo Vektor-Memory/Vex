@@ -140,26 +140,67 @@ function chunkTurn(conv, senderFilter, namespace) {
 /**
  * conversation — one record per whole conversation (concatenated turns)
  */
-function chunkConversation(conv, senderFilter, namespace) {
+function chunkConversation(conv, senderFilter, namespace, maxChars) {
   const parts = conv.messages
     .filter(m => (senderFilter === 'both' || m.role === senderFilter) && m.text)
     .map(m => `[${m.role.toUpperCase()}]\n${m.text}`);
 
   if (!parts.length) return [];
 
-  return [toRecord({
-    id:         conv.id,
-    text:       parts.join('\n\n---\n\n'),
-    vector:     null,
-    namespace:  namespace || 'claude-conversations',
-    created_at: conv.created_at || new Date().toISOString(),
-    metadata: {
-      conversation_name: truncate(conv.name, 80),
-      turn_count:        conv.messages.length,
-      source_format:     'claude-export',
-      chunk_mode:        'conversation',
-    },
-  }, 'claude-export')];
+  const fullText = parts.join('\n\n---\n\n');
+
+  // No maxChars — single record (original behaviour)
+  if (!maxChars || fullText.length <= maxChars) {
+    return [toRecord({
+      id:         conv.id,
+      text:       fullText,
+      vector:     null,
+      namespace:  namespace || 'claude-conversations',
+      created_at: conv.created_at || new Date().toISOString(),
+      metadata: {
+        conversation_name: truncate(conv.name, 80),
+        turn_count:        conv.messages.length,
+        source_format:     'claude-export',
+        chunk_mode:        'conversation',
+      },
+    }, 'claude-export')];
+  }
+
+  // Split into maxChars chunks, breaking on '---' separators where possible
+  const records = [];
+  let remaining = fullText;
+  let part = 1;
+  while (remaining.length > 0) {
+    let chunk;
+    if (remaining.length <= maxChars) {
+      chunk = remaining;
+      remaining = '';
+    } else {
+      // Try to break at last '---' separator before maxChars
+      const boundary = remaining.lastIndexOf('\n\n---\n\n', maxChars);
+      const cutAt = boundary > maxChars * 0.5 ? boundary : maxChars;
+      chunk = remaining.slice(0, cutAt);
+      remaining = remaining.slice(cutAt).replace(/^\s*---\s*\n/, '').trimStart();
+    }
+    const totalParts = Math.ceil(fullText.length / maxChars);
+    records.push(toRecord({
+      id:         part === 1 ? conv.id : `${conv.id}:p${part}`,
+      text:       chunk,
+      vector:     null,
+      namespace:  namespace || 'claude-conversations',
+      created_at: conv.created_at || new Date().toISOString(),
+      metadata: {
+        conversation_name: truncate(conv.name, 80),
+        turn_count:        conv.messages.length,
+        source_format:     'claude-export',
+        chunk_mode:        'conversation',
+        part,
+        total_parts:       totalParts,
+      },
+    }, 'claude-export'));
+    part++;
+  }
+  return records;
 }
 
 /**
@@ -208,6 +249,7 @@ export const claudeExportConnector = {
     const senderRaw   = (opts['sender'] || 'both').toLowerCase();
     const namespace   = opts['namespace'] || null;
     const limitConvs  = opts['limit-convs'] ? parseInt(opts['limit-convs']) : null;
+    const maxChars    = opts['max-chars']   ? parseInt(opts['max-chars'])   : null;
     const limitMsgs   = opts['limit']       ? parseInt(opts['limit'])       : null;
     const afterDate   = opts['after']       ? new Date(opts['after'])       : null;
     const beforeDate  = opts['before']      ? new Date(opts['before'])      : null;
@@ -249,7 +291,7 @@ export const claudeExportConnector = {
     let records = [];
     for (const conv of conversations) {
       let chunk;
-      if (chunkMode === 'conversation') chunk = chunkConversation(conv, sender, namespace);
+      if (chunkMode === 'conversation') chunk = chunkConversation(conv, sender, namespace, maxChars);
       else if (chunkMode === 'exchange') chunk = chunkExchange(conv, sender, namespace);
       else                               chunk = chunkTurn(conv, sender, namespace);
       records.push(...chunk);

@@ -1,271 +1,203 @@
-import { createRequire } from 'module';
-import { batchLoad } from '../utils/batch.js';
-import { progress, summary } from '../utils/progress.js';
-import { toRecord } from '../formats/vmig.js';
+/**
+ * connectors/pgvector.js — PostgreSQL + pgvector extension
+ * Requires: pg (npm install pg)
+ * pgvector extension must be installed: CREATE EXTENSION IF NOT EXISTS vector;
+ *
+ * Usage:
+ *   vex migrate --from vektor --to pgvector --url postgres://user:pass@localhost:5432/mydb
+ *   vex migrate --from vektor --to pgvector --url postgres://user:pass@localhost:5432/mydb --table vex_memories
+ *
+ * Supabase:
+ *   vex migrate ... --url postgresql://postgres:[password]@db.[ref].supabase.co:5432/postgres
+ *
+ * Table schema (auto-created):
+ *   id TEXT PRIMARY KEY
+ *   content TEXT
+ *   namespace TEXT
+ *   importance FLOAT
+ *   tags TEXT
+ *   entities TEXT
+ *   potential TEXT
+ *   created_at BIGINT
+ *   source TEXT
+ *   vector vector(1536)   -- or detected dim
+ *   metadata JSONB
+ */
 
-// pg is a peer dep — load dynamically so missing it gives a clear error
-async function getPg() {
+import { toRecord } from '../formats/vmig.js';
+import { createRequire } from 'module';
+
+const require        = createRequire(import.meta.url);
+const DEFAULT_TABLE  = 'vex_memories';
+const BATCH_SIZE     = 100;
+
+function getPool(opts) {
   try {
-    const require = createRequire(import.meta.url);
-    return require('pg');
-  } catch {
-    throw new Error('[pgvector] "pg" package not found. Run: npm install pg');
+    const { Pool } = require('pg');
+    const url = opts.url || opts['pg-url'] || process.env.PGVECTOR_URL || process.env.DATABASE_URL;
+    if (!url) throw new Error('--url <postgres://...> required');
+    return new Pool({ connectionString: url });
+  } catch (e) {
+    if (e.message.includes('pg package')) throw e;
+    throw new Error('pg package not found — run: npm install pg');
   }
+}
+
+async function ensureTable(client, table, dim) {
+  // Enable pgvector extension
+  await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+
+  // Create table
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS ${table} (
+      id          TEXT PRIMARY KEY,
+      content     TEXT,
+      namespace   TEXT DEFAULT 'default',
+      importance  FLOAT DEFAULT 0.6,
+      tags        TEXT,
+      entities    TEXT,
+      potential   TEXT,
+      created_at  BIGINT,
+      source      TEXT,
+      metadata    JSONB,
+      vector      vector(${dim})
+    )
+  `);
+
+  // Indexes
+  await client.query(`CREATE INDEX IF NOT EXISTS ${table}_ns_idx ON ${table} (namespace)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS ${table}_imp_idx ON ${table} (importance DESC)`);
+  await client.query(`CREATE INDEX IF NOT EXISTS ${table}_ts_idx ON ${table} (created_at DESC)`);
+
+  // IVFFlat vector index -- only useful at scale (>1000 rows)
+  // Using HNSW for better recall (requires pgvector >= 0.5.0)
+  try {
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS ${table}_vec_idx
+      ON ${table} USING hnsw (vector vector_cosine_ops)
+      WITH (m = 16, ef_construction = 64)
+    `);
+  } catch {
+    // Fall back to IVFFlat if HNSW not available
+    try {
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS ${table}_vec_idx
+        ON ${table} USING ivfflat (vector vector_cosine_ops)
+        WITH (lists = 100)
+      `);
+    } catch {
+      console.log(`[pgvector] vector index skipped -- needs more rows or older pgvector`);
+    }
+  }
+
+  console.log(`[pgvector] table "${table}" ready (dim=${dim})`);
 }
 
 export const pgvectorConnector = {
   name: 'pgvector',
 
-  // ── EXPORT ───────────────────────────────────────────────────────────────
   async extract(opts) {
-    const t0        = Date.now();
-    const connStr   = opts['url']       || process.env.PGVECTOR_URL || process.env.DATABASE_URL;
-    const table     = opts['table']     || process.env.PGVECTOR_TABLE || 'vex_vectors';
-    const namespace = opts['namespace'] || null;
-    const limit     = opts['limit']     ? parseInt(opts['limit']) : null;
-
-    if (!connStr) throw new Error('[pgvector] --url or PGVECTOR_URL required (postgres://user:pass@host/db)');
-
-    const { Pool } = await getPg();
-    const pool = new Pool({ connectionString: connStr });
+    const pool    = getPool(opts);
+    const client  = await pool.connect();
+    const table   = opts.table || DEFAULT_TABLE;
+    const ns      = opts.namespace;
+    const limit   = parseInt(opts.limit || '10000');
 
     try {
-      // check table exists
-      const check = await pool.query(
-        `SELECT COUNT(*) FROM information_schema.tables WHERE table_name=$1`, [table]
-      );
-      if (check.rows[0].count === '0') throw new Error(`[pgvector] table "${table}" not found`);
+      const query = ns
+        ? `SELECT * FROM ${table} WHERE namespace = $1 ORDER BY created_at DESC LIMIT $2`
+        : `SELECT * FROM ${table} ORDER BY created_at DESC LIMIT $1`;
+      const params = ns ? [ns, limit] : [limit];
+      const res    = await client.query(query, params);
 
-      // get columns
-      const cols = await pool.query(
-        `SELECT column_name FROM information_schema.columns WHERE table_name=$1`, [table]
-      );
-      const colNames = cols.rows.map(r => r.column_name);
-      const hasText     = colNames.includes('text');
-      const hasModel    = colNames.includes('model');
-      const hasNs       = colNames.includes('namespace');
-      const hasCreated  = colNames.includes('created_at');
-      const hasMeta     = colNames.includes('metadata');
+      const records = res.rows.map(row => toRecord({
+        id:         row.id,
+        text:       row.content || '',
+        vector:     row.vector  ? JSON.parse(row.vector) : null,
+        namespace:  row.namespace || 'default',
+        importance: row.importance || 0.6,
+        tags:       row.tags || '',
+        created_at: Number(row.created_at || 0),
+      }, 'pgvector'));
 
-      // count
-      let countQ = `SELECT COUNT(*) FROM "${table}"`;
-      const countP = [];
-      if (namespace && hasNs) { countQ += ` WHERE namespace=$1`; countP.push(namespace); }
-      const total = parseInt((await pool.query(countQ, countP)).rows[0].count);
-      console.log(`[pgvector] table "${table}" — ${total} rows`);
-
-      const records = [];
-      const pageSize = 500;
-      let offset = 0;
-
-      while (true) {
-        let q = `SELECT id, vector::text`;
-        if (hasText)    q += ', text';
-        if (hasModel)   q += ', model';
-        if (hasNs)      q += ', namespace';
-        if (hasCreated) q += ', created_at';
-        if (hasMeta)    q += ', metadata';
-        q += ` FROM "${table}"`;
-        const params = [];
-        if (namespace && hasNs) { q += ` WHERE namespace=$${params.length+1}`; params.push(namespace); }
-        q += ` ORDER BY id LIMIT ${pageSize} OFFSET ${offset}`;
-
-        const res = await pool.query(q, params);
-        if (!res.rows.length) break;
-
-        for (const row of res.rows) {
-          // pg returns vector as string like "[0.1,0.2,...]"
-          let vector = null;
-          if (row.vector) {
-            try { vector = JSON.parse(row.vector.replace(/^\[/, '[').replace(/\]$/, ']')); } catch {}
-            if (!Array.isArray(vector)) {
-              vector = row.vector.replace(/[[\]]/g, '').split(',').map(Number);
-            }
-          }
-          let meta = null;
-          if (row.metadata) {
-            try { meta = typeof row.metadata === 'object' ? row.metadata : JSON.parse(row.metadata); } catch {}
-          }
-          records.push(toRecord({
-            id:         String(row.id),
-            text:       row.text       || null,
-            vector,
-            model:      row.model      || null,
-            namespace:  row.namespace  || null,
-            created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
-            metadata:   meta,
-          }, 'pgvector'));
-
-          if (limit && records.length >= limit) break;
-        }
-
-        progress(records.length, limit ?? total, 'pgvector export');
-        if (limit && records.length >= limit) break;
-        offset += pageSize;
-        if (res.rows.length < pageSize) break;
-      }
-
-      process.stdout.write('\n');
-      console.log(`[pgvector] extracted ${records.length} records in ${((Date.now()-t0)/1000).toFixed(1)}s`);
+      console.log(`[pgvector] extracted ${records.length} rows from "${table}"`);
       return records;
     } finally {
+      client.release();
       await pool.end();
     }
   },
 
-  // ── IMPORT ───────────────────────────────────────────────────────────────
   async load(records, opts) {
-    const t0        = Date.now();
-    const connStr   = opts['url']   || process.env.PGVECTOR_URL || process.env.DATABASE_URL;
-    const table     = opts['table'] || process.env.PGVECTOR_TABLE || 'vex_vectors';
-    const autoCreate = opts['auto-create'] !== 'false';
+    const pool   = getPool(opts);
+    const client = await pool.connect();
+    const table  = opts.table || DEFAULT_TABLE;
 
-    if (!connStr) throw new Error('[pgvector] --url or PGVECTOR_URL required');
-
-    const { Pool } = await getPg();
-    const pool = new Pool({ connectionString: connStr });
+    // Detect vector dim
+    const sample = records.find(r => r.vector && r.vector.length);
+    const dim    = sample ? sample.vector.length : 1536;
 
     try {
-      // detect dims
-      const firstVec = records.find(r => Array.isArray(r.vector) && r.vector.length > 0);
-      const dims = firstVec?.vector?.length;
-      if (!dims) throw new Error('[pgvector] no records with vectors found');
-
-      // ensure pgvector extension
-      await pool.query(`CREATE EXTENSION IF NOT EXISTS vector`);
-
-      if (autoCreate) {
-        await pool.query(`
-          CREATE TABLE IF NOT EXISTS "${table}" (
-            id          TEXT PRIMARY KEY,
-            vector      vector(${dims}),
-            text        TEXT,
-            model       TEXT,
-            namespace   TEXT,
-            created_at  TIMESTAMPTZ,
-            metadata    JSONB
-          )
-        `);
-        // create ivfflat index if table was just created or index missing
-        await pool.query(`
-          CREATE INDEX IF NOT EXISTS "${table}_vec_idx"
-          ON "${table}" USING ivfflat (vector vector_cosine_ops)
-          WITH (lists = 100)
-        `).catch(() => {}); // non-fatal — requires rows to exist for ivfflat
-        console.log(`[pgvector] ✓ table "${table}" ready (dims=${dims})`);
-      }
-
-      const withVectors = records.filter(r => Array.isArray(r.vector) && r.vector.length === dims);
-      const skipped     = records.length - withVectors.length;
-      if (skipped) console.warn(`[pgvector] ⚠  ${skipped} records skipped (null/dim-mismatch vector)`);
+      await ensureTable(client, table, dim);
 
       let upserted = 0;
-      await batchLoad(withVectors, async batch => {
-        // build multi-row upsert
-        const values = [];
-        const params = [];
-        let pIdx = 1;
+      let skipped  = 0;
+
+      for (let i = 0; i < records.length; i += BATCH_SIZE) {
+        const batch = records.slice(i, i + BATCH_SIZE);
+
         for (const r of batch) {
-          values.push(`($${pIdx},$${pIdx+1},$${pIdx+2},$${pIdx+3},$${pIdx+4},$${pIdx+5},$${pIdx+6})`);
-          params.push(
-            r.id,
-            `[${r.vector.join(',')}]`,
-            r.text       || null,
-            r.model      || null,
-            r.namespace  || null,
-            r.created_at || null,
-            r.metadata   ? JSON.stringify(r.metadata) : null
-          );
-          pIdx += 7;
-        }
-        await pool.query(`
-          INSERT INTO "${table}" (id, vector, text, model, namespace, created_at, metadata)
-          VALUES ${values.join(',')}
-          ON CONFLICT (id) DO UPDATE SET
-            vector=EXCLUDED.vector, text=EXCLUDED.text, model=EXCLUDED.model,
-            namespace=EXCLUDED.namespace, created_at=EXCLUDED.created_at, metadata=EXCLUDED.metadata
-        `, params);
-        upserted += batch.length;
-      }, { batchSize: 200, retries: 3, onProgress: (d,t) => progress(d,t,'pgvector') });
+          try {
+            const tags      = Array.isArray(r.metadata?.tags) ? r.metadata.tags.join(',') : (r.metadata?.tags || '');
+            const entities  = Array.isArray(r.metadata?.entities) ? r.metadata.entities.join(',') : '';
+            const potential = Array.isArray(r.metadata?.potential) ? r.metadata.potential.join('|||') : '';
+            const vector    = r.vector && r.vector.length === dim
+                                ? `[${r.vector.join(',')}]`
+                                : null;
 
-      summary({ connector:'pgvector', total:records.length, upserted, skipped, durationMs:Date.now()-t0 });
-    } finally {
-      await pool.end();
-    }
-  },
- async extractStream(opts, onPage) {
-    const connStr   = opts['url']   || process.env.PGVECTOR_URL || process.env.DATABASE_URL;
-    const table     = opts['table'] || process.env.PGVECTOR_TABLE || 'vex_vectors';
-    const namespace = opts['namespace'] || null;
-    const limit     = opts['limit'] ? parseInt(opts['limit']) : null;
+            await client.query(`
+              INSERT INTO ${table}
+                (id, content, namespace, importance, tags, entities, potential, created_at, source, metadata, vector)
+              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::vector)
+              ON CONFLICT (id) DO UPDATE SET
+                content    = EXCLUDED.content,
+                namespace  = EXCLUDED.namespace,
+                importance = EXCLUDED.importance,
+                tags       = EXCLUDED.tags,
+                entities   = EXCLUDED.entities,
+                potential  = EXCLUDED.potential,
+                source     = EXCLUDED.source,
+                metadata   = EXCLUDED.metadata,
+                vector     = EXCLUDED.vector
+            `, [
+              String(r.id),
+              r.text || '',
+              r.namespace || 'default',
+              r.metadata?.importance || 0.6,
+              tags,
+              entities,
+              potential,
+              r.created_at || Math.floor(Date.now() / 1000),
+              r.source || 'vex',
+              JSON.stringify(r.metadata || {}),
+              vector,
+            ]);
 
-    if (!connStr) throw new Error('[pgvector] --url required');
-
-    const { Pool } = await getPg();
-    const pool = new Pool({ connectionString: connStr });
-
-    try {
-      const cols    = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name=$1`, [table]);
-      const colNames = cols.rows.map(r => r.column_name);
-      const has = f => colNames.includes(f);
-
-      let countQ  = `SELECT COUNT(*) FROM "${table}"`;
-      const countP = [];
-      if (namespace && has('namespace')) { countQ += ` WHERE namespace=$1`; countP.push(namespace); }
-      const total = parseInt((await pool.query(countQ, countP)).rows[0].count);
-      console.log(`[pgvector] stream export — "${table}" (${total} rows)`);
-
-      const pageSize = 500;
-      let offset = 0;
-      let sent   = 0;
-
-      while (true) {
-        let q = `SELECT id, vector::text`;
-        if (has('text'))       q += ', text';
-        if (has('model'))      q += ', model';
-        if (has('namespace'))  q += ', namespace';
-        if (has('created_at')) q += ', created_at';
-        if (has('metadata'))   q += ', metadata';
-        q += ` FROM "${table}"`;
-
-        const params = [];
-        if (namespace && has('namespace')) { q += ` WHERE namespace=$${params.length+1}`; params.push(namespace); }
-        q += ` ORDER BY id LIMIT ${Math.min(pageSize, limit ? limit - sent : pageSize)} OFFSET ${offset}`;
-
-        const res = await pool.query(q, params);
-        if (!res.rows.length) break;
-
-        const page = [];
-        for (const row of res.rows) {
-          let vector = null;
-          if (row.vector) {
-            try { vector = JSON.parse(row.vector); } catch {}
-            if (!Array.isArray(vector)) vector = row.vector.replace(/[\[\]]/g, '').split(',').map(Number);
+            upserted++;
+          } catch (e) {
+            console.error(`\n[pgvector] row error (${r.id}): ${e.message}`);
+            skipped++;
           }
-          let meta = null;
-          if (row.metadata) try { meta = typeof row.metadata === 'object' ? row.metadata : JSON.parse(row.metadata); } catch {}
-
-          page.push(toRecord({
-            id:         String(row.id),
-            text:       row.text || null,
-            vector,
-            model:      row.model || null,
-            namespace:  row.namespace || null,
-            created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
-            metadata:   meta,
-          }, 'pgvector'));
-          sent++;
-          if (limit && sent >= limit) break;
         }
 
-        await onPage(page);
-        progress(sent, limit ?? total, 'pgvector stream');
-        if (limit && sent >= limit) break;
-        offset += pageSize;
-        if (res.rows.length < pageSize) break;
+        process.stdout.write(`\r[pgvector] ${Math.min(i + BATCH_SIZE, records.length)}/${records.length}`);
       }
+
       process.stdout.write('\n');
+      console.log(`[pgvector] wrote ${upserted} rows to "${table}" (${skipped} failed)`);
+      return { upserted, skipped };
     } finally {
+      client.release();
       await pool.end();
     }
   },
