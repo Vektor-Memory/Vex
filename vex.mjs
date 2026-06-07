@@ -9,7 +9,6 @@ import { runPipeline }                          from './pipeline/index.js';
 import fs                                        from 'fs';
 import readline                                  from 'readline';
 
-// ── PALETTE ────────────────────────────────────────────────────────────────
 const _ = {
   reset:  '\x1b[0m',
   bold:   '\x1b[1m',
@@ -40,27 +39,25 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.8.1';
+const VERSION = '0.8.4';
 
-// ── BANNER ─────────────────────────────────────────────────────────────────
 function banner() {
   console.log('');
-  console.log(Co('  ██╗   ██╗') + St('███████╗') + Sk('██╗  ██╗'));
-  console.log(Co('  ██║   ██║') + St('██╔════╝') + Sk('╚██╗██╔╝'));
-  console.log(Co('  ██║   ██║') + St('█████╗  ') + Sk(' ╚███╔╝ '));
-  console.log(Co('  ╚██╗ ██╔╝') + St('██╔══╝  ') + Sk(' ██╔██╗ '));
-  console.log(Co('   ╚████╔╝ ') + St('███████╗') + Sk('██╔╝ ██╗') + '  ' + Gr(`v${VERSION}`));
-  console.log(Co('    ╚═══╝  ') + St('╚══════╝') + Sk('╚═╝  ╚═╝'));
+  console.log(Co('  \u2588\u2588\u2557   \u2588\u2588\u2557') + St('\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557') + Sk('\u2588\u2588\u2557  \u2588\u2588\u2557'));
+  console.log(Co('  \u2588\u2588\u2551   \u2588\u2588\u2551') + St('\u2588\u2588\u2554\u2550\u2550\u2550\u2550\u255d') + Sk('\u255a\u2588\u2588\u2557\u2588\u2588\u2554\u255d'));
+  console.log(Co('  \u2588\u2588\u2551   \u2588\u2588\u2551') + St('\u2588\u2588\u2588\u2588\u2588\u2557  ') + Sk(' \u255a\u2588\u2588\u2588\u2554\u255d '));
+  console.log(Co('  \u255a\u2588\u2588\u2557 \u2588\u2588\u2554\u255d') + St('\u2588\u2588\u2554\u2550\u2550\u255d  ') + Sk(' \u2588\u2588\u2554\u2588\u2588\u2557 '));
+  console.log(Co('   \u255a\u2588\u2588\u2588\u2588\u2554\u255d ') + St('\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2557') + Sk('\u2588\u2588\u2554\u255d \u2588\u2588\u2557') + '  ' + Gr(`v${VERSION}`));
+  console.log(Co('    \u255a\u2550\u2550\u2550\u255d  ') + St('\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u255d') + Sk('\u255a\u2550\u255d  \u255a\u2550\u255d'));
   console.log('');
-  console.log('  ' + W('Vector Exchange') + Gr('  ·  Apache 2.0  ·  github.com/Vektor-Memory/Vex'));
+  console.log('  ' + W('Vector Exchange') + Gr('  \u00b7  Apache 2.0  \u00b7  github.com/Vektor-Memory/Vex'));
   console.log('');
 }
 
-// ── BOX HELPERS ────────────────────────────────────────────────────────────
-const BAR = St('│');
-const TL  = St('┌─');
-const BL  = St('└');
-const HR  = St('─');
+const BAR = St('\u2502');
+const TL  = St('\u250c\u2500');
+const BL  = St('\u2514');
+const HR  = St('\u2500');
 
 function box(label) {
   console.log('  ' + TL + ' ' + Ic(label) + ' ' + HR.repeat(Math.max(2, 44 - label.length)));
@@ -78,7 +75,6 @@ function blank() {
   console.log('  ' + BAR);
 }
 
-// ── HELP ───────────────────────────────────────────────────────────────────
 function showHelp() {
   banner();
 
@@ -87,34 +83,37 @@ function showHelp() {
   row(W('import'),   Sk('vex import')    + Gr('  --from <file>   --to <store>'));
   row(W('migrate'),  Sk('vex migrate')   + Gr('  --from <store>  --to <store>'));
   row(W('convert'),  Sk('vex convert')   + Gr('  --from <file.vmig.jsonl>  --adapter <name>  --output <file>'));
-  row(W('sign'),     Sk('vex sign')      + Gr('  <file>  — BLAKE3 + Ed25519 sign export'));
-  row(W('verify'),   Sk('vex verify')    + Gr('  <file>  — verify signature (exit 0=ok 1=tampered)'));
-  row(W('inspect'),  Sk('vex inspect')   + Gr('  <file>  — show stats, models, namespaces'));
-  row(W('validate'), Sk('vex validate')  + Gr('  <file>  — lint all records'));
-  row(W('adapters'), Sk('vex adapters')  + Gr('  — list available vec2vec projection pairs'));
+  row(W('sign'),     Sk('vex sign')      + Gr('  <file>  \u2014 BLAKE3 + Ed25519 sign export'));
+  row(W('verify'),   Sk('vex verify')    + Gr('  <file>  \u2014 verify signature (exit 0=ok 1=tampered)'));
+  row(W('inspect'),  Sk('vex inspect')   + Gr('  <file>  \u2014 show stats, models, namespaces'));
+  row(W('validate'), Sk('vex validate')  + Gr('  <file>  \u2014 lint all records'));
+  row(W('adapters'), Sk('vex adapters')  + Gr('  \u2014 list available vec2vec projection pairs'));
   boxEnd();
 
   box('CONNECTORS');
-  row(G('✓') + ' ' + W('vektor'),        Si('VEKTOR Slipstream SQLite   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('jsonl'),         Si('.vmig.jsonl file           ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('pinecone'),      Si('Pinecone                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('qdrant'),        Si('Qdrant                     ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('chroma'),        Si('ChromaDB                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('weaviate'),      Si('Weaviate                   ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('pgvector'),      Si('PostgreSQL / pgvector       ') + Ic('export · import'));
-  row(G('✓') + ' ' + W('claude-export'), Si('Claude conversation JSON    ') + Ic('export only'));
-  row(G('✓') + ' ' + W('chatgpt-export'),Si('ChatGPT conversation JSON   ') + Ic('export only'));
+  row(G('\u2713') + ' ' + W('vektor'),         Si('VEKTOR Slipstream SQLite   ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('jsonl'),          Si('.vmig.jsonl file           ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('pinecone'),       Si('Pinecone                   ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('qdrant'),         Si('Qdrant                     ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('chroma'),         Si('ChromaDB                   ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('weaviate'),       Si('Weaviate                   ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('pgvector'),       Si('PostgreSQL / pgvector       ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('redis'),          Si('Redis / Redis Stack         ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('milvus'),         Si('Milvus / Zilliz Cloud        ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('neo4j'),          Si('Neo4j / Aura                ') + Ic('export \u00b7 import'));
+  row(G('\u2713') + ' ' + W('claude-export'),  Si('Claude conversation JSON    ') + Ic('export only'));
+  row(G('\u2713') + ' ' + W('chatgpt-export'), Si('ChatGPT conversation JSON   ') + Ic('export only'));
   boxEnd();
 
   box('CONVERT ADAPTERS');
-  row(G('✓') + ' ' + W('openai-finetune'),    Si('OpenAI fine-tuning JSONL     ') + Ic('POST /v1/fine_tuning/jobs'));
-  row(G('✓') + ' ' + W('openai-context'),     Si('OpenAI chat messages JSON    ') + Ic('context injection'));
-  row(G('✓') + ' ' + W('generic-chat'),       Si('Generic {role,content} JSONL ') + Ic('Perplexity · Groq · Mistral · Together'));
-  row(G('✓') + ' ' + W('anthropic-finetune'), Si('Anthropic Messages format     ') + Ic('Messages API / fine-tune'));
-  row(G('✓') + ' ' + W('plain-text'),         Si('Human-readable transcript     ') + Ic('.txt'));
+  row(G('\u2713') + ' ' + W('openai-finetune'),    Si('OpenAI fine-tuning JSONL     ') + Ic('POST /v1/fine_tuning/jobs'));
+  row(G('\u2713') + ' ' + W('openai-context'),     Si('OpenAI chat messages JSON    ') + Ic('context injection'));
+  row(G('\u2713') + ' ' + W('generic-chat'),       Si('Generic {role,content} JSONL ') + Ic('Perplexity \u00b7 Groq \u00b7 Mistral \u00b7 Together'));
+  row(G('\u2713') + ' ' + W('anthropic-finetune'), Si('Anthropic Messages format     ') + Ic('Messages API / fine-tune'));
+  row(G('\u2713') + ' ' + W('plain-text'),         Si('Human-readable transcript     ') + Ic('.txt'));
   blank();
-  console.log('  ' + BAR + '  ' + Gr('  Aliases: perplexity, groq, mistral, together → generic-chat'));
-  console.log('  ' + BAR + '  ' + Gr('           anthropic → anthropic-finetune  |  txt → plain-text'));
+  console.log('  ' + BAR + '  ' + Gr('  Aliases: perplexity, groq, mistral, together \u2192 generic-chat'));
+  console.log('  ' + BAR + '  ' + Gr('           anthropic \u2192 anthropic-finetune  |  txt \u2192 plain-text'));
   boxEnd();
 
   box('COMMON FLAGS');
@@ -125,14 +124,14 @@ function showHelp() {
   row(Sk('--db'),            Gr('<path>   VEKTOR SQLite DB path'));
   row(Sk('--sign'),          G('v0.4') + Gr('   auto-sign after export (BLAKE3 + Ed25519)'));
   row(Sk('--reembed'),       Gr('         re-embed dim-mismatched records from text'));
-  row(Sk('--adapter'),       G('vec2vec') + Gr(' translate embeddings — no API required'));
+  row(Sk('--adapter'),       G('vec2vec') + Gr(' translate embeddings \u2014 no API required'));
   row(Sk('--adapter-model'), Gr('<model>  target model name for --adapter'));
   row(Sk('--embed-model'),   Gr('<model>  model for --reembed (default: text-embedding-3-small)'));
   boxEnd();
 
-  box('CONVERSATION EXPORT FLAGS  (claude-export · chatgpt-export)');
+  box('CONVERSATION EXPORT FLAGS  (claude-export \u00b7 chatgpt-export)');
   row(Sk('--file'),              Gr('<path>   conversations.json from export'));
-  row(Sk('--mode'),              G('★') + Gr('  raw | extract | smart  (default: raw)'));
+  row(Sk('--mode'),              G('\u2605') + Gr('  raw | extract | smart  (default: raw)'));
   row(Sk('--chunk-mode'),        Gr('turn | conversation | exchange  (default: conversation)'));
   row(Sk('--sender'),            Gr('both | user | assistant  (default: both)'));
   row(Sk('--max-chars'),         Gr('<n>      split long conversations at N chars'));
@@ -145,13 +144,13 @@ function showHelp() {
   boxEnd();
 
   box('EXTRACTION FLAGS  (--mode extract | smart)');
-  row(Sk('--provider'),          G('auto') + Gr(' auto|groq,ollama,openai  — cascade order (default: auto)'));
-  row(Sk('--groq-key'),          G('free') + Gr('  key1,key2,key3  — Groq keys rotated round-robin'));
-  row(Sk('--openai-key'),        Gr('<key>    OpenAI API key  — gpt-4o-mini'));
-  row(Sk('--anthropic-key'),     Gr('<key>    Anthropic API key  — claude-haiku'));
-  row(Sk('--mistral-key'),       Gr('<key>    Mistral API key  — mistral-small'));
-  row(Sk('--together-key'),      Gr('<key>    Together.ai key  — Llama-3.2-3B'));
-  row(Sk('--ollama-url'),        Gr('<url>    Ollama URL  — local, unlimited, free'));
+  row(Sk('--provider'),          G('auto') + Gr(' auto|groq,ollama,openai  \u2014 cascade order (default: auto)'));
+  row(Sk('--groq-key'),          G('free') + Gr('  key1,key2,key3  \u2014 Groq keys rotated round-robin'));
+  row(Sk('--openai-key'),        Gr('<key>    OpenAI API key  \u2014 gpt-4o-mini'));
+  row(Sk('--anthropic-key'),     Gr('<key>    Anthropic API key  \u2014 claude-haiku'));
+  row(Sk('--mistral-key'),       Gr('<key>    Mistral API key  \u2014 mistral-small'));
+  row(Sk('--together-key'),      Gr('<key>    Together.ai key  \u2014 Llama-3.2-3B'));
+  row(Sk('--ollama-url'),        Gr('<url>    Ollama URL  \u2014 local, unlimited, free'));
   row(Sk('--ollama-draft'),      G('fast') + Gr(' <model>  spec decoding draft model (2-4x speed)'));
   row(Sk('--extract-url'),       Gr('<url>    Custom OpenAI-compatible endpoint'));
   row(Sk('--extract-model'),     Gr('<model>  groq:llama-3.3-70b,ollama:mistral or global'));
@@ -184,20 +183,20 @@ function showHelp() {
   boxEnd();
 
   box('CONVERT FLAGS');
-  row(Sk('--from'),          Gr('<file.vmig.jsonl>  input file'));
-  row(Sk('--adapter'),       Gr('<name>   openai-finetune | openai-context | generic-chat | anthropic-finetune | plain-text'));
-  row(Sk('--output'),        Gr('<file>   output path (extension auto-appended if omitted)'));
-  row(Sk('--system-prompt'), Gr('<text>   prepend system message (openai-* and anthropic-*)'));
-  row(Sk('--max-tokens'),    Gr('<n>      token budget hint for openai-context (approx)'));
+  row(Sk('--from'),            Gr('<file.vmig.jsonl>  input file'));
+  row(Sk('--adapter'),         Gr('<name>   openai-finetune | openai-context | generic-chat | anthropic-finetune | plain-text'));
+  row(Sk('--output'),          Gr('<file>   output path (extension auto-appended if omitted)'));
+  row(Sk('--system-prompt'),   Gr('<text>   prepend system message (openai-* and anthropic-*)'));
+  row(Sk('--max-tokens'),      Gr('<n>      token budget hint for openai-context (approx)'));
   row(Sk('--conversation-id'), Gr('<id>   filter to single conversation (openai-context)'));
-  row(Sk('--separator'),     Gr('<str>    section separator for plain-text (default: ═×72)'));
+  row(Sk('--separator'),       Gr('<str>    section separator for plain-text (default: \u2550\u00d772)'));
   blank();
-  console.log('  ' + BAR + '  ' + Sk('vex convert --adapter list') + Gr('  — show all adapters'));
+  console.log('  ' + BAR + '  ' + Sk('vex convert --adapter list') + Gr('  \u2014 show all adapters'));
   boxEnd();
 
   box('SIGN / VERIFY  (v0.4)');
-  row(Sk('--key'),     Gr('<path>  private key file (auto-generated if missing)'));
-  row(Sk('--sig'),     Gr('<path>  .vmig.sig file (default: <file>.vmig.sig)'));
+  row(Sk('--key'), Gr('<path>  private key file (auto-generated if missing)'));
+  row(Sk('--sig'), Gr('<path>  .vmig.sig file (default: <file>.vmig.sig)'));
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Sign an export (generates .vmig.sig + .vmig.key)'));
   console.log('  ' + BAR + '  ' + Sk('vex sign') + ' memories.vmig.jsonl');
@@ -241,6 +240,23 @@ function showHelp() {
   row(Sk('--table'), Gr('<name>            or ') + Ic('PGVECTOR_TABLE') + Gr('  default: vex_vectors'));
   boxEnd();
 
+  box('REDIS OPTIONS');
+  row(Sk('--redis-url'), Gr('<url>   or ') + Ic('REDIS_URL') + Gr('  default: redis://localhost:6379'));
+  row(Sk('--index'),     Gr('<name>  RediSearch index name  default: vex-memory'));
+  boxEnd();
+
+  box('MILVUS OPTIONS');
+  row(Sk('--milvus-url'),   Gr('<url>   or ') + Ic('MILVUS_URL') + Gr('  default: localhost:19530'));
+  row(Sk('--milvus-token'), Gr('<key>   or ') + Ic('MILVUS_TOKEN') + Gr('  (Zilliz Cloud)'));
+  row(Sk('--collection'),   Gr('<name>  collection name  default: vex_memory'));
+  boxEnd();
+
+  box('NEO4J OPTIONS');
+  row(Sk('--neo4j-url'),      Gr('<url>   or ') + Ic('NEO4J_URL') + Gr('  default: bolt://localhost:7687'));
+  row(Sk('--neo4j-user'),     Gr('<user>  or ') + Ic('NEO4J_USER') + Gr('  default: neo4j'));
+  row(Sk('--neo4j-password'), Gr('<pass>  or ') + Ic('NEO4J_PASSWORD'));
+  boxEnd();
+
   box('RE-EMBED / ADAPTER');
   row(Sk('--reembed'),       Gr('re-embed via OpenAI or Ollama on dim mismatch'));
   row(Sk('--openai-key'),    Gr('<key>  or ') + Ic('OPENAI_API_KEY'));
@@ -254,72 +270,34 @@ function showHelp() {
   console.log('  ' + BAR + '  ' + Gr('# Export VEKTOR memory'));
   console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --output memories.vmig.jsonl');
   blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export ChatGPT conversations → vmig'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from chatgpt-export --file conversations.json --output chatgpt.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Migrate ChatGPT conversations directly into VEKTOR DB'));
-  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from chatgpt-export --to vektor --file conversations.json --db memory.db');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export Claude conversations → vmig'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from claude-export --file conversations.json --output claude.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Migrate Claude conversations directly into VEKTOR DB'));
-  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json --db memory.db');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Convert to OpenAI fine-tuning format'));
-  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter openai-finetune --output finetune.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Convert to Perplexity / Groq / Mistral / Together (generic chat)'));
-  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter generic-chat --output chat.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Convert to Anthropic Messages API format'));
-  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter anthropic-finetune --output anthropic.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Convert to plain text transcript'));
-  console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --from claude.vmig.jsonl --adapter plain-text --output transcripts.txt');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export with chunking + embedding'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from claude-export --file conversations.json --output out.vmig.jsonl \\');
-  console.log('  ' + BAR + '  ' + Gr('             --chunk-mode exchange --sender both --openai-key $KEY --namespace claude'));
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export working + procedural memories only (PAM five-component model)'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --components working,procedural --output state.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export specific namespace only'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --namespace trading --output trading.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Export from Qdrant'));
-  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from qdrant --collection memories --output memories.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Import into Pinecone'));
-  console.log('  ' + BAR + '  ' + Sk('vex import') + ' --from memories.vmig.jsonl --to pinecone --api-key $KEY --index my-index --host $HOST');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Import with vec2vec projection (no re-embedding API needed)'));
-  console.log('  ' + BAR + '  ' + Sk('vex import') + ' --from memories.vmig.jsonl --to qdrant --collection mem --adapter --adapter-model text-embedding-3-small');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# RECOMMENDED: Migrate Claude conversations with LLM fact extraction (Groq free tier)'));
+  console.log('  ' + BAR + '  ' + Gr('# Migrate Claude conversations with LLM fact extraction'));
   console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
-  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode extract --groq-key $GROQ_KEY --namespace my-history'));
+  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode smart --openai-key $KEY --namespace my-history'));
   blank();
-  console.log('  ' + BAR + '  ' + Gr('# Smart mode: exchange chunks for short convs, extraction for all'));
-  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
-  console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode smart --groq-key $GROQ_KEY'));
+  console.log('  ' + BAR + '  ' + Gr('# Migrate VEKTOR \u2192 Redis'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from vektor --to redis --db memory.db --redis-url redis://localhost:6379');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Migrate VEKTOR \u2192 Neo4j'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from vektor --to neo4j --db memory.db --neo4j-url bolt://localhost:7687');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Migrate VEKTOR \u2192 Milvus'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from vektor --to milvus --db memory.db --milvus-url localhost:19530');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Migrate VEKTOR \u2192 pgvector / Supabase'));
+  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from vektor --to pgvector --db memory.db --url postgres://user:pass@localhost/db');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Export + sign'));
+  console.log('  ' + BAR + '  ' + Sk('vex export') + ' --from vektor --db memory.db --output mem.vmig.jsonl --sign');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Verify before importing'));
+  console.log('  ' + BAR + '  ' + Sk('vex verify') + ' memories.vmig.jsonl && ' + Sk('vex import') + ' --from memories.vmig.jsonl --to qdrant --collection mem');
+  blank();
+  console.log('  ' + BAR + '  ' + Gr('# Inspect a file'));
+  console.log('  ' + BAR + '  ' + Sk('vex inspect') + ' memories.vmig.jsonl');
   blank();
   console.log('  ' + BAR + '  ' + Gr('# Dry run: preview extracted facts without writing to DB'));
   console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from claude-export --to vektor --file conversations.json \\');
   console.log('  ' + BAR + '  ' + Gr('             --db memory.db --mode extract --groq-key $GROQ_KEY --dry-run'));
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Migrate Qdrant → VEKTOR'));
-  console.log('  ' + BAR + '  ' + Sk('vex migrate') + ' --from qdrant --to vektor --collection memories --db memory.db');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Sign an export for tamper-evident transfer'));
-  console.log('  ' + BAR + '  ' + Sk('vex sign') + ' memories.vmig.jsonl');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Verify before importing'));
-  console.log('  ' + BAR + '  ' + Sk('vex verify') + ' memories.vmig.jsonl && vex import --from memories.vmig.jsonl --to qdrant --collection mem');
-  blank();
-  console.log('  ' + BAR + '  ' + Gr('# Inspect a file'));
-  console.log('  ' + BAR + '  ' + Sk('vex inspect') + ' memories.vmig.jsonl');
   blank();
   console.log('  ' + BAR + '  ' + Gr('# List all convert adapters'));
   console.log('  ' + BAR + '  ' + Sk('vex convert') + ' --adapter list');
@@ -327,16 +305,15 @@ function showHelp() {
   boxEnd();
 }
 
-// ── INSPECT ────────────────────────────────────────────────────────────────
 async function cmdInspect(file) {
   if (!file || !fs.existsSync(file)) {
-    console.error('\n' + R(`  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+    console.error('\n' + R(`  \u2717  File not found: ${file || '(none provided)'}`)); process.exit(1);
   }
   banner();
   console.log('  ' + Gr(`Inspecting: ${file}`) + '\n');
 
   const records = await readJsonl(file);
-  if (!records.length) { console.log(Y('  ⚠  File is empty')); return; }
+  if (!records.length) { console.log(Y('  \u26a0   File is empty')); return; }
 
   const models = {}, dims = {}, namespaces = {}, stores = {};
   let nullVec = 0, nullText = 0;
@@ -364,8 +341,8 @@ async function cmdInspect(file) {
     row(Si('latest'),   Gr(dates[dates.length - 1]));
   }
   if (meta) {
-    row(Si('checksum'),    Gr(meta.checksum    || '—'));
-    row(Si('exported at'), Gr(meta.exported_at || '—'));
+    row(Si('checksum'),    Gr(meta.checksum    || '\u2014'));
+    row(Si('exported at'), Gr(meta.exported_at || '\u2014'));
     if (meta.imported_to) row(Si('imported to'), Ic(meta.imported_to) + Gr(' @ ' + meta.imported_at));
   }
   boxEnd();
@@ -376,10 +353,9 @@ async function cmdInspect(file) {
   if (Object.keys(stores).length)     { box('SOURCES');    for (const [s,n] of Object.entries(stores))      row(Si(s),         Gr(`${n} records`)); boxEnd(); }
 }
 
-// ── VALIDATE ───────────────────────────────────────────────────────────────
 async function cmdValidate(file) {
   if (!file || !fs.existsSync(file)) {
-    console.error('\n' + R(`  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+    console.error('\n' + R(`  \u2717  File not found: ${file || '(none provided)'}`)); process.exit(1);
   }
   banner();
   console.log('  ' + Gr(`Validating: ${file}`) + '\n');
@@ -393,30 +369,29 @@ async function cmdValidate(file) {
     const errs = validate(records[i]);
     if (errs.length) {
       errors++;
-      console.log('  ' + BAR + '  ' + R(`✗  [${i}] id=${records[i].id ?? '?'}`));
-      for (const e of errs) console.log('  ' + BAR + '     ' + Gr(`→ ${e}`));
+      console.log('  ' + BAR + '  ' + R(`\u2717  [${i}] id=${records[i].id ?? '?'}`));
+      for (const e of errs) console.log('  ' + BAR + '     ' + Gr(`\u2192 ${e}`));
     }
     if (!records[i].vector && records[i].text) {
       warnings++;
-      console.log('  ' + BAR + '  ' + Y(`⚠  [${i}] no vector — re-embeddable from text`));
+      console.log('  ' + BAR + '  ' + Y(`\u26a0   [${i}] no vector \u2014 re-embeddable from text`));
     }
   }
 
   if (!errors && !warnings)
-    console.log('  ' + BAR + '  ' + G(`✓  All ${records.length} records valid`));
+    console.log('  ' + BAR + '  ' + G(`\u2713  All ${records.length} records valid`));
 
   boxEnd();
   box('RESULT');
   row(Si('records'),  W(String(records.length)));
   row(Si('errors'),   errors   ? R(String(errors))   : G('0'));
   row(Si('warnings'), warnings ? Y(String(warnings)) : G('0'));
-  row(Si('status'),   errors   ? R('✗  INVALID')     : G('✓  VALID'));
+  row(Si('status'),   errors   ? R('\u2717  INVALID') : G('\u2713  VALID'));
   boxEnd();
 
   if (errors) process.exit(1);
 }
 
-// ── ADAPTERS (vec2vec) ─────────────────────────────────────────────────────
 async function cmdAdapters() {
   banner();
   box('VEX-ADAPTER  PROJECTION PAIRS');
@@ -429,7 +404,7 @@ async function cmdAdapters() {
         console.log('  ' + BAR + '  ' + Gr('No projection pairs available.'));
       } else {
         for (const [src, tgt] of pairs) {
-          row(Ic(src), Gr('→  ') + Sk(tgt));
+          row(Ic(src), Gr('\u2192  ') + Sk(tgt));
         }
       }
     }
@@ -440,69 +415,62 @@ async function cmdAdapters() {
   boxEnd();
 }
 
-// ── SIGN ───────────────────────────────────────────────────────────────────
 async function cmdSign(file, flags) {
   if (!file || !fs.existsSync(file)) {
-    console.error(R(`\n  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+    console.error(R(`\n  \u2717  File not found: ${file || '(none provided)'}`)); process.exit(1);
   }
   banner();
-  console.log('  ' + G('→') + '  Signing ' + Gr(file) + '\n');
+  console.log('  ' + G('\u2192') + '  Signing ' + Gr(file) + '\n');
   try {
-    const sig = await signExport(file, {
-      keyFile: flags.key || null,
-      saveKey: true,
-    });
-    console.log('\n  ' + G('✓') + '  ' + W(String(sig.record_count)) + ' records signed');
-    console.log('  ' + G('✓') + '  Signature → ' + Gr(file.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
+    const sig = await signExport(file, { keyFile: flags.key || null, saveKey: true });
+    console.log('\n  ' + G('\u2713') + '  ' + W(String(sig.record_count)) + ' records signed');
+    console.log('  ' + G('\u2713') + '  Signature \u2192 ' + Gr(file.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
   } catch (err) {
     if (err.message.includes('@noble')) {
-      console.error('\n' + Y('  ⚠  Signing requires @noble packages:'));
+      console.error('\n' + Y('  \u26a0   Signing requires @noble packages:'));
       console.error(Y('     npm install @noble/hashes @noble/ed25519') + '\n');
     } else {
-      console.error('\n' + R(`  ✗  ${err.message}`));
+      console.error('\n' + R(`  \u2717  ${err.message}`));
     }
     process.exit(1);
   }
 }
 
-// ── VERIFY ─────────────────────────────────────────────────────────────────
 async function cmdVerify(file, flags) {
   if (!file || !fs.existsSync(file)) {
-    console.error(R(`\n  ✗  File not found: ${file || '(none provided)'}`)); process.exit(1);
+    console.error(R(`\n  \u2717  File not found: ${file || '(none provided)'}`)); process.exit(1);
   }
   banner();
-  console.log('  ' + G('→') + '  Verifying ' + Gr(file) + '\n');
+  console.log('  ' + G('\u2192') + '  Verifying ' + Gr(file) + '\n');
   try {
     const result = await verifyExport(file, { sigFile: flags.sig || null });
     if (result.valid) {
-      console.log('\n  ' + G('✓') + '  ' + W('Signature valid') + ' — file has not been tampered with\n');
+      console.log('\n  ' + G('\u2713') + '  ' + W('Signature valid') + ' \u2014 file has not been tampered with\n');
       process.exit(0);
     } else {
-      console.log('\n  ' + R('✗  Verification FAILED'));
-      for (const e of result.errors) console.log('  ' + R('   → ') + Gr(e));
+      console.log('\n  ' + R('\u2717  Verification FAILED'));
+      for (const e of result.errors) console.log('  ' + R('   \u2192 ') + Gr(e));
       console.log('');
       process.exit(1);
     }
   } catch (err) {
     if (err.message.includes('@noble')) {
-      console.error('\n' + Y('  ⚠  Verification requires @noble packages:'));
+      console.error('\n' + Y('  \u26a0   Verification requires @noble packages:'));
       console.error(Y('     npm install @noble/hashes @noble/ed25519') + '\n');
     } else {
-      console.error('\n' + R(`  ✗  ${err.message}`));
+      console.error('\n' + R(`  \u2717  ${err.message}`));
     }
     process.exit(1);
   }
 }
 
-// ── EXPORT ─────────────────────────────────────────────────────────────────
 async function cmdExport(flags) {
-  if (!flags.from)   { console.error(R('\n  ✗  --from required'));   process.exit(1); }
-  if (!flags.output && !flags.o) { console.error(R('\n  ✗  --output required')); process.exit(1); }
+  if (!flags.from)   { console.error(R('\n  \u2717  --from required'));   process.exit(1); }
+  if (!flags.output && !flags.o) { console.error(R('\n  \u2717  --output required')); process.exit(1); }
 
   const outPath   = flags.output || flags.o;
   const connector = getConnector(flags.from);
 
-  // ── --components filter (PAM five-component selective disclosure) ────────
   if (flags.components) {
     const allowed = new Set(
       String(flags.components).toLowerCase().split(',').map(s => s.trim()).filter(Boolean)
@@ -510,25 +478,24 @@ async function cmdExport(flags) {
     const VALID_TYPES = new Set(['episodic', 'semantic', 'procedural', 'working', 'identity']);
     for (const t of allowed) {
       if (!VALID_TYPES.has(t)) {
-        console.error(R(`\n  ✗  Unknown component type: "${t}"`));
+        console.error(R(`\n  \u2717  Unknown component type: "${t}"`));
         console.error(Gr('     Valid types: episodic, semantic, procedural, working, identity'));
         process.exit(1);
       }
     }
     flags._componentFilter = allowed;
-    console.log('  ' + G('→') + '  Component filter: ' + Ic([...allowed].join(', ')));
+    console.log('  ' + G('\u2192') + '  Component filter: ' + Ic([...allowed].join(', ')));
   }
 
   banner();
-  const nsLabel    = flags.namespace  ? Gr(` [ns: ${flags.namespace}]`)         : '';
-  const limLabel   = flags.limit      ? Gr(` [limit: ${flags.limit}]`)           : '';
-  const compLabel  = flags.components ? Y(`  [components: ${flags.components}]`) : '';
-  const chunkLabel = flags['chunk-mode'] ? Gr(` [chunk: ${flags['chunk-mode']}]`) : '';
-  console.log('  ' + G('→') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + compLabel + chunkLabel + '\n');
+  const nsLabel    = flags.namespace     ? Gr(` [ns: ${flags.namespace}]`)          : '';
+  const limLabel   = flags.limit         ? Gr(` [limit: ${flags.limit}]`)            : '';
+  const compLabel  = flags.components    ? Y(`  [components: ${flags.components}]`)  : '';
+  const chunkLabel = flags['chunk-mode'] ? Gr(` [chunk: ${flags['chunk-mode']}]`)    : '';
+  console.log('  ' + G('\u2192') + '  Exporting from ' + Ic(flags.from) + nsLabel + limLabel + compLabel + chunkLabel + '\n');
 
   let total = await streamExport(connector, flags, outPath);
 
-  // ── Post-export component filter ─────────────────────────────────────────
   if (flags._componentFilter) {
     const allowed  = flags._componentFilter;
     const raw      = fs.readFileSync(outPath, 'utf8').split('\n').filter(l => l.trim());
@@ -541,7 +508,7 @@ async function cmdExport(flags) {
     });
     fs.writeFileSync(outPath, filtered.join('\n') + '\n', 'utf8');
     total = filtered.length;
-    console.log(`  ${G('→')}  Component filter applied: ${total} records kept`);
+    console.log(`  ${G('\u2192')}  Component filter applied: ${total} records kept`);
   }
 
   await writeMeta(outPath, {
@@ -550,33 +517,31 @@ async function cmdExport(flags) {
     components:   flags.components || null,
   });
 
-  console.log('\n  ' + G('✓') + '  ' + W(String(total)) + ' records exported → ' + Gr(outPath) + '\n');
+  console.log('\n  ' + G('\u2713') + '  ' + W(String(total)) + ' records exported \u2192 ' + Gr(outPath) + '\n');
 
-  // ── Auto-sign ─────────────────────────────────────────────────────────────
   if (flags.sign) {
-    console.log('  ' + G('→') + '  Auto-signing...\n');
+    console.log('  ' + G('\u2192') + '  Auto-signing...\n');
     try {
       await signExport(outPath, { keyFile: flags.key || null, saveKey: true });
-      console.log('  ' + G('✓') + '  Signed → ' + Gr(outPath.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
+      console.log('  ' + G('\u2713') + '  Signed \u2192 ' + Gr(outPath.replace(/\.vmig\.jsonl$/, '.vmig.sig')) + '\n');
     } catch (err) {
-      console.warn(Y(`  ⚠  Sign failed (install @noble/hashes @noble/ed25519): ${err.message}`));
+      console.warn(Y(`  \u26a0   Sign failed (install @noble/hashes @noble/ed25519): ${err.message}`));
     }
   }
 }
 
-// ── IMPORT ─────────────────────────────────────────────────────────────────
 async function cmdImport(flags) {
-  if (!flags.from) { console.error(R('\n  ✗  --from required')); process.exit(1); }
-  if (!flags.to)   { console.error(R('\n  ✗  --to required'));   process.exit(1); }
+  if (!flags.from) { console.error(R('\n  \u2717  --from required')); process.exit(1); }
+  if (!flags.to)   { console.error(R('\n  \u2717  --to required'));   process.exit(1); }
   if (!fs.existsSync(flags.from)) {
-    console.error(R(`\n  ✗  File not found: ${flags.from}`)); process.exit(1);
+    console.error(R(`\n  \u2717  File not found: ${flags.from}`)); process.exit(1);
   }
 
   const connector = getConnector(flags.to);
 
   banner();
   const adapterLabel = flags.adapter ? G('  [vec2vec adapter]') : flags.reembed ? Y('  [reembed]') : '';
-  console.log('  ' + G('→') + '  ' + Gr(flags.from) + ' → ' + Ic(flags.to) + adapterLabel + '\n');
+  console.log('  ' + G('\u2192') + '  ' + Gr(flags.from) + ' \u2192 ' + Ic(flags.to) + adapterLabel + '\n');
 
   const { total, upserted, skipped } = await streamImport(flags.from, connector, flags);
 
@@ -585,37 +550,32 @@ async function cmdImport(flags) {
     imported_at: new Date().toISOString(),
   });
 
-  console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + ' upserted' +
+  console.log('\n  ' + G('\u2713') + '  ' + W(String(upserted)) + ' upserted' +
     (skipped ? '  ' + Y(`${skipped} skipped`) : '') + '\n');
 }
 
-// ── MIGRATE ────────────────────────────────────────────────────────────────
 async function cmdMigrate(flags) {
-  if (!flags.from) { console.error(R('\n  ✗  --from required')); process.exit(1); }
-  if (!flags.to)   { console.error(R('\n  ✗  --to required'));   process.exit(1); }
+  if (!flags.from) { console.error(R('\n  \u2717  --from required')); process.exit(1); }
+  if (!flags.to)   { console.error(R('\n  \u2717  --to required'));   process.exit(1); }
 
   const fromConnector = getConnector(flags.from);
   const toConnector   = getConnector(flags.to);
   const mode          = flags.mode || 'raw';
 
-  // ── Pipeline mode: conversation exports with LLM extraction ────────────
   const isPipelineSource = ['claude-export','chatgpt-export'].includes(flags.from);
-  const usePipeline      = isPipelineSource && (mode !== 'raw' || flags['dry-run']);
 
   banner();
   const modeLabel    = Gr(`  [mode: ${mode}]`);
   const adapterLabel = flags.adapter ? G('  [vec2vec adapter]') : flags.reembed ? Y('  [reembed]') : '';
   const chunkLabel   = flags['chunk-mode'] ? Gr(`  [chunk: ${flags['chunk-mode']}]`) : '';
-  console.log('  ' + G('→') + '  Migrating ' + Ic(flags.from) + ' → ' + Ic(flags.to) + modeLabel + adapterLabel + chunkLabel + '\n');
+  console.log('  ' + G('\u2192') + '  Migrating ' + Ic(flags.from) + ' \u2192 ' + Ic(flags.to) + modeLabel + adapterLabel + chunkLabel + '\n');
 
   if (isPipelineSource) {
-    // Re-parse the original conversations from the file
     const filePath = flags.file || flags.from;
     if (!fs.existsSync(filePath)) throw new Error('--file <conversations.json> required');
     const raw  = JSON.parse(fs.readFileSync(filePath, 'utf8'));
     const list = Array.isArray(raw) ? raw : (Array.isArray(raw?.conversations) ? raw.conversations : []);
 
-    // Normalise to pipeline conversation format
     const conversations = list.map(conv => {
       const msgs = (conv.chat_messages || conv.messages || []).map(m => ({
         id:   m.uuid || m.id || crypto.randomUUID(),
@@ -631,33 +591,29 @@ async function cmdMigrate(flags) {
       };
     });
 
-    // Apply limit-convs filter before pipeline
-    const limitConvs = flags['limit-convs'] ? parseInt(flags['limit-convs']) : null;
+    const limitConvs    = flags['limit-convs'] ? parseInt(flags['limit-convs']) : null;
     const pipelineConvs = limitConvs ? conversations.slice(0, limitConvs) : conversations;
     process.stdout.write('[pipeline] processing ' + pipelineConvs.length + ' conversations' + (limitConvs ? ' (limited from ' + conversations.length + ')' : '') + '\n');
     const result = await runPipeline(pipelineConvs, toConnector, { ...flags, mode });
 
     if (result.dryRun) {
-      console.log('\n  ' + Y('⚠  DRY RUN') + '  ' + W(String(result.facts)) + ' facts would be extracted, ' + W(String(result.edges)) + ' edges\n');
+      console.log('\n  ' + Y('\u26a0   DRY RUN') + '  ' + W(String(result.facts)) + ' facts would be extracted, ' + W(String(result.edges)) + ' edges\n');
     } else {
-      console.log('\n  ' + G('✓') + '  ' + W(String(result.upserted)) + ' facts stored' +
+      console.log('\n  ' + G('\u2713') + '  ' + W(String(result.upserted)) + ' facts stored' +
         (result.skipped ? '  ' + Y(`${result.skipped} skipped`) : '') +
         '  ' + Gr(`${result.edges} edges`) + '\n');
     }
     return;
   }
 
-  // ── Standard migrate (non-conversation sources) ─────────────────────────
   const { total, upserted, skipped } = await coreMigrate(fromConnector, toConnector, flags);
   const _skStr = skipped > 0 ? ' (' + skipped + ' duplicate/skipped)' : '';
-  console.log('\n  ' + G('✓') + '  ' + W(String(upserted)) + ' new records written' + _skStr + ' / ' + String(total) + ' total\n');
+  console.log('\n  ' + G('\u2713') + '  ' + W(String(upserted)) + ' new records written' + _skStr + ' / ' + String(total) + ' total\n');
 }
 
-// ── CONVERT ────────────────────────────────────────────────────────────────
 async function cmdConvert(flags) {
-  if (!flags.adapter) { console.error(R('\n  ✗  --adapter required (try --adapter list)')); process.exit(1); }
+  if (!flags.adapter) { console.error(R('\n  \u2717  --adapter required (try --adapter list)')); process.exit(1); }
 
-  // ── list mode — no --from or --output needed ──────────────────────────────
   if (flags.adapter === 'list') {
     banner();
     box('CONVERT ADAPTERS');
@@ -665,70 +621,64 @@ async function cmdConvert(flags) {
     for (const a of adapters) {
       const nameCol = W(a.name.padEnd(22));
       const extCol  = Ic(`.${a.ext}  `);
-      const descCol = Gr(a.description.length > 58 ? a.description.slice(0, 55) + '…' : a.description);
+      const descCol = Gr(a.description.length > 58 ? a.description.slice(0, 55) + '\u2026' : a.description);
       row(nameCol, extCol + descCol);
     }
     blank();
-    console.log('  ' + BAR + '  ' + Gr('Aliases: perplexity / groq / mistral / together → generic-chat'));
-    console.log('  ' + BAR + '  ' + Gr('         anthropic → anthropic-finetune  |  txt → plain-text'));
+    console.log('  ' + BAR + '  ' + Gr('Aliases: perplexity / groq / mistral / together \u2192 generic-chat'));
+    console.log('  ' + BAR + '  ' + Gr('         anthropic \u2192 anthropic-finetune  |  txt \u2192 plain-text'));
     boxEnd();
     return;
   }
 
-  if (!flags.from)               { console.error(R('\n  ✗  --from required'));    process.exit(1); }
-  if (!flags.output && !flags.o) { console.error(R('\n  ✗  --output required')); process.exit(1); }
-
+  if (!flags.from)               { console.error(R('\n  \u2717  --from required'));    process.exit(1); }
+  if (!flags.output && !flags.o) { console.error(R('\n  \u2717  --output required')); process.exit(1); }
   if (!fs.existsSync(flags.from)) {
-    console.error(R(`\n  ✗  File not found: ${flags.from}`)); process.exit(1);
+    console.error(R(`\n  \u2717  File not found: ${flags.from}`)); process.exit(1);
   }
 
   let adapter;
   try {
     adapter = getConvertAdapter(flags.adapter);
   } catch (e) {
-    console.error(R(`\n  ✗  ${e.message}`));
+    console.error(R(`\n  \u2717  ${e.message}`));
     console.log('  Run ' + Sk('vex convert --adapter list') + ' to see available adapters.\n');
     process.exit(1);
   }
 
   banner();
-  console.log('  ' + G('→') + '  Converting ' + Gr(flags.from) + ' → ' + Ic(adapter.name) + '\n');
+  console.log('  ' + G('\u2192') + '  Converting ' + Gr(flags.from) + ' \u2192 ' + Ic(adapter.name) + '\n');
 
   const records = await readJsonl(flags.from);
-  if (!records.length) {
-    console.error(Y('\n  ⚠  Input file is empty')); process.exit(1);
-  }
+  if (!records.length) { console.error(Y('\n  \u26a0   Input file is empty')); process.exit(1); }
 
   box('CONVERT');
   row(Si('records'),    W(String(records.length)));
   row(Si('adapter'),    Ic(adapter.name));
   row(Si('output ext'), Gr('.' + adapter.fileExtension));
-  if (flags['system-prompt']) row(Si('system prompt'), Gr(flags['system-prompt'].slice(0, 50) + (flags['system-prompt'].length > 50 ? '…' : '')));
+  if (flags['system-prompt']) row(Si('system prompt'), Gr(flags['system-prompt'].slice(0, 50) + (flags['system-prompt'].length > 50 ? '\u2026' : '')));
   if (flags['chunk-mode'])    row(Si('chunk mode'),    Gr(flags['chunk-mode']));
   boxEnd();
 
-  const output = adapter.convert(records, flags);
-
-  // Auto-append extension if outPath has none
+  const output    = adapter.convert(records, flags);
   const outPath   = flags.output || flags.o;
   const finalPath = outPath.includes('.') ? outPath : `${outPath}.${adapter.fileExtension}`;
 
   fs.writeFileSync(finalPath, output, 'utf8');
 
   const lineCount = output.trim().split('\n').filter(Boolean).length;
-  console.log('  ' + G('✓') + '  ' + W(String(lineCount)) + ' lines written → ' + Gr(finalPath) + '\n');
+  console.log('  ' + G('\u2713') + '  ' + W(String(lineCount)) + ' lines written \u2192 ' + Gr(finalPath) + '\n');
 }
 
-// ── INTERACTIVE MENU ───────────────────────────────────────────────────────
 async function interactiveMenu() {
   banner();
   console.log('  ' + W('No command given.') + Gr('  Run ') + Sk('vex --help') + Gr(' for full docs.\n'));
 
   const opts = [
-    ['1', 'export',   'Export memory → .vmig.jsonl'],
-    ['2', 'import',   'Import .vmig.jsonl → any store'],
+    ['1', 'export',   'Export memory \u2192 .vmig.jsonl'],
+    ['2', 'import',   'Import .vmig.jsonl \u2192 any store'],
     ['3', 'migrate',  'Migrate directly between stores'],
-    ['4', 'convert',  'Convert .vmig.jsonl → LLM provider format'],
+    ['4', 'convert',  'Convert .vmig.jsonl \u2192 LLM provider format'],
     ['5', 'sign',     'Sign export (BLAKE3 + Ed25519)'],
     ['6', 'verify',   'Verify signature'],
     ['7', 'inspect',  'Inspect a .vmig.jsonl file'],
@@ -745,7 +695,7 @@ async function interactiveMenu() {
   console.log('');
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  rl.question('  ' + Sk('→') + '  ', answer => {
+  rl.question('  ' + Sk('\u2192') + '  ', answer => {
     rl.close();
     const map = {
       '1':'export','2':'import','3':'migrate','4':'convert',
@@ -755,12 +705,11 @@ async function interactiveMenu() {
     console.log('');
     if (ch === 'h') { showHelp(); return; }
     if (ch === 'q' || !ch) process.exit(0);
-    if (map[ch]) console.log('  ' + G('✓') + '  Run: ' + Sk(`vex ${map[ch]} --help`) + '\n');
-    else         console.log('  ' + R('✗') + '  Unknown option.\n');
+    if (map[ch]) console.log('  ' + G('\u2713') + '  Run: ' + Sk(`vex ${map[ch]} --help`) + '\n');
+    else         console.log('  ' + R('\u2717') + '  Unknown option.\n');
   });
 }
 
-// ── FLAG PARSER ────────────────────────────────────────────────────────────
 function parseFlags(argv) {
   const flags = {};
   for (let i = 0; i < argv.length; i++) {
@@ -774,31 +723,30 @@ function parseFlags(argv) {
   return flags;
 }
 
-// ── MAIN ───────────────────────────────────────────────────────────────────
 const args  = process.argv.slice(2);
 const cmd   = args[0];
 const flags = parseFlags(args);
 
 try {
-  if (!cmd)                                      { await interactiveMenu();                                         }
-  else if (['--help','-h','help'].includes(cmd)) { showHelp();                                                      }
-  else if (['--version','-v'].includes(cmd))     { console.log(`vex v${VERSION}`);                                  }
-  else if (cmd === 'sign')                       { await cmdSign(args[1] || flags.file || flags.from, flags);       }
-  else if (cmd === 'verify')                     { await cmdVerify(args[1] || flags.file || flags.from, flags);     }
-  else if (cmd === 'inspect')                    { await cmdInspect(args[1] || flags.file || flags.from);           }
-  else if (cmd === 'validate')                   { await cmdValidate(args[1] || flags.file || flags.from);          }
-  else if (cmd === 'adapters')                   { await cmdAdapters();                                             }
-  else if (cmd === 'export')                     { await cmdExport(flags);                                          }
-  else if (cmd === 'import')                     { await cmdImport(flags);                                          }
-  else if (cmd === 'migrate')                    { await cmdMigrate(flags);                                         }
-  else if (cmd === 'convert')                    { await cmdConvert(flags);                                         }
+  if (!cmd)                                      { await interactiveMenu();                                     }
+  else if (['--help','-h','help'].includes(cmd)) { showHelp();                                                  }
+  else if (['--version','-v'].includes(cmd))     { console.log(`vex v${VERSION}`);                              }
+  else if (cmd === 'sign')                       { await cmdSign(args[1] || flags.file || flags.from, flags);   }
+  else if (cmd === 'verify')                     { await cmdVerify(args[1] || flags.file || flags.from, flags); }
+  else if (cmd === 'inspect')                    { await cmdInspect(args[1] || flags.file || flags.from);       }
+  else if (cmd === 'validate')                   { await cmdValidate(args[1] || flags.file || flags.from);      }
+  else if (cmd === 'adapters')                   { await cmdAdapters();                                         }
+  else if (cmd === 'export')                     { await cmdExport(flags);                                      }
+  else if (cmd === 'import')                     { await cmdImport(flags);                                      }
+  else if (cmd === 'migrate')                    { await cmdMigrate(flags);                                     }
+  else if (cmd === 'convert')                    { await cmdConvert(flags);                                     }
   else {
-    console.error(R(`\n  ✗  Unknown command: ${cmd}`));
+    console.error(R(`\n  \u2717  Unknown command: ${cmd}`));
     console.log('  Run ' + Sk('vex --help') + ' to see available commands.\n');
     process.exit(1);
   }
 } catch (err) {
-  console.error('\n' + R(`  ✗  ${err.message}`));
+  console.error('\n' + R(`  \u2717  ${err.message}`));
   if (process.env.DEBUG) console.error(err);
   process.exit(1);
 }
