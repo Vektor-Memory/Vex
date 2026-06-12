@@ -1,6 +1,8 @@
-# VEX — Vector Exchange
+# VEX — Vector Exchange - v0.8.5
 
 **Cross-standard vector DB migration, memory portability, and sovereign backup for AI agents.**
+<img width="1070" height="469" alt="image" src="https://github.com/user-attachments/assets/032120ae-c585-453f-a2a4-9f94f2e3499a" />
+
 
 Move memories between any vector store. Import Claude and ChatGPT conversation history with LLM fact extraction. Back up encrypted memory to GitHub, Codeberg, or self-hosted Gitea. Convert to any LLM provider format.
 
