@@ -1,12 +1,8 @@
-# VEX — Vector Exchange - v0.8.5
+# VEX — Vector Exchange
 
-**Cross-standard vector DB migration and memory portability for AI agents.**
+**Cross-standard vector DB migration, memory portability, and sovereign backup for AI agents.**
 
-Move memories between any vector store. Import Claude and ChatGPT conversation history with LLM fact extraction. Convert to any LLM provider format. Sign exports for tamper-evident transfer.
-
-<img width="1070" height="469" alt="image" src="https://github.com/user-attachments/assets/97f63124-e8fd-414c-ad85-d8fdf079c00e" />
-
-
+Move memories between any vector store. Import Claude and ChatGPT conversation history with LLM fact extraction. Back up encrypted memory to GitHub, Codeberg, or self-hosted Gitea. Convert to any LLM provider format.
 
 ```bash
 npm install -g @vektormemory/vex
@@ -15,6 +11,22 @@ npm install -g @vektormemory/vex
 [![npm](https://img.shields.io/npm/v/@vektormemory/vex)](https://www.npmjs.com/package/@vektormemory/vex)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-green)](package.json)
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `vex sync` | **Sovereign hybrid backup** — encrypt and push memory to GitHub, Codeberg, or Gitea |
+| `vex migrate` | Migrate directly between any two vector stores |
+| `vex export` | Export memory to `.vmig.jsonl` portable format |
+| `vex import` | Import `.vmig.jsonl` into any store |
+| `vex convert` | Convert to OpenAI, Anthropic, Groq, or plain text format |
+| `vex sign` | Sign export with BLAKE3 + Ed25519 |
+| `vex verify` | Verify export signature |
+| `vex inspect` | Show stats, namespaces, dimensions |
+| `vex validate` | Lint all records in a `.vmig.jsonl` file |
 
 ---
 
@@ -34,6 +46,69 @@ npm install -g @vektormemory/vex
 | **Claude export** | ✓ | — | conversations.json from Claude |
 | **ChatGPT export** | ✓ | — | conversations.json from ChatGPT |
 | **.vmig.jsonl** | ✓ | ✓ | Portable interchange format |
+
+---
+
+## Sovereign Backup — `vex sync`
+
+Back up VEKTOR memory to any Git host. Encrypted client-side with AES-256-GCM. Cloud stores ciphertext only — no plaintext memory ever leaves your machine.
+
+**Supported providers:**
+
+| Provider | Cost | Notes |
+|----------|------|-------|
+| **GitHub** | Free private repos | Familiar, reliable |
+| **Codeberg** | Free, nonprofit | GDPR-compliant, no tracking — recommended |
+| **Gitea** | Self-hosted | Full sovereignty, single binary, runs on any VPS |
+| **GitLab** | Free tier | gitlab.com or self-hosted |
+
+```bash
+# Initialize with Codeberg (recommended — free, GDPR, nonprofit)
+vex sync init --provider codeberg \
+  --token cb_xxx \
+  --owner alice \
+  --repo vektor-backup \
+  --db ~/.vektor/slipstream-memory.db
+
+# Initialize with GitHub
+vex sync init --provider github \
+  --token ghp_xxx \
+  --owner alice \
+  --repo vektor-backup \
+  --db ~/.vektor/slipstream-memory.db
+
+# Initialize with self-hosted Gitea (full sovereignty)
+vex sync init --provider gitea \
+  --gitea-url https://git.example.com \
+  --token xxx \
+  --owner alice \
+  --repo vektor-backup \
+  --db ~/.vektor/slipstream-memory.db
+
+# Push all memories (encrypted)
+vex sync push
+
+# Push only high-importance memories (lean backup)
+vex sync push --min-importance 3
+
+# Check sync status
+vex sync status
+
+# Compare local vs remote
+vex sync diff
+
+# Restore to new machine
+vex sync pull --db ~/new-machine-memory.db
+
+# Dry run restore (preview without writing)
+vex sync pull --db ~/memory.db --dry-run
+```
+
+**How encryption works:**
+- Key = HKDF-SHA256(machine-id + token hash) — derived locally, never transmitted
+- Payload = AES-256-GCM encrypted export — blob is opaque to the Git host
+- Manifest = plaintext metadata only (memory count, timestamp) — no content
+- To restore on a new machine: provide your original token + re-run `vex sync init`
 
 ---
 

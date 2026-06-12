@@ -1,5 +1,44 @@
 # VEX Changelog
 
+## v0.8.5 (2026-06-12)
+
+### New Feature: `vex sync` — Sovereign Hybrid Memory Backup
+
+Back up VEKTOR memory to any Git host with client-side AES-256-GCM encryption. Cloud stores ciphertext only. Key is derived from machine-id + token — never leaves your machine. No VEKTOR servers involved at any point.
+
+**Providers supported:**
+- **GitHub** — free private repos, familiar tooling
+- **Codeberg** — free, nonprofit, GDPR-compliant, no tracking (recommended)
+- **Gitea** — self-hosted, full sovereignty, single binary, runs on any VPS
+- **GitLab** — gitlab.com or self-hosted
+
+**Commands:**
+```bash
+vex sync init   --provider codeberg --token cb_xxx --owner alice --repo vektor-backup --db ~/.vektor/memory.db
+vex sync push   [--min-importance 3]  [--namespace default]  [--limit 500]
+vex sync pull   --db ~/new-machine.db  [--dry-run]
+vex sync status
+vex sync diff
+```
+
+**Architecture:**
+- Export memories from local DB
+- Encrypt with AES-256-GCM (HKDF key: machine-id + tokenHash — derived locally, never transmitted)
+- Push encrypted blob to `memory/vektor-backup.enc` in private Git repo
+- Push plaintext manifest (count + timestamp only, no memory content) to `memory/manifest.json`
+- Pull: fetch blob, decrypt, upsert into target DB
+- Config stored at `~/.vex/sync.json`, token at `~/.vex/sync.key` (chmod 600)
+
+**Restore on a new machine:** re-run `vex sync init` with your original token, then `vex sync pull`.
+
+---
+
+## v0.8.4 (2026-06-07)
+
+- Version bump and stability fixes
+
+---
+
 ## v0.8.2 (2026-06-06)
 
 ### Bug Fixes
