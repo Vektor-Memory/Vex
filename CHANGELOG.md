@@ -2,7 +2,81 @@
 
 ## v0.8.6 (2026-06-15)
 
--Ink CLI improvements
+### Added: Interactive TUI — full arrow-key command palette
+
+Running `vex` with no arguments now launches an Ink-powered terminal UI instead
+of showing plain-text help. Each command has a guided wizard that builds the
+correct flags from step-by-step prompts.
+
+```bash
+vex           # launches interactive TUI (real TTY only)
+vex --help    # plain-text help unchanged
+vex export --from vektor --output mem.vmig.jsonl   # direct CLI unchanged
+```
+
+**Palette** — arrow keys to navigate, enter to select, `q` to quit.
+
+**Per-command wizards:**
+
+| Command | Wizard flow |
+|---|---|
+| `export` | store picker → DB path (vektor only) → output path |
+| `import` | file path → store picker |
+| `migrate` | from-store picker → to-store picker |
+| `convert` | file path → adapter picker (5 formats) |
+| `sync` | action picker (init / push / pull / status / diff) |
+| `sign` | file path input + key generation hint |
+| `verify` | file path input |
+| `inspect` | file path input |
+| `validate` | file path input |
+| `adapters` | immediate run — no input needed |
+
+All 11 connectors available in pickers: vektor, claude-export, chatgpt-export,
+pinecone, qdrant, chroma, weaviate, pgvector, redis, milvus, neo4j.
+
+**TTY guard** — TUI only launches when `process.stdout.isTTY && !process.env.CI`.
+Falls back to plain help in CI, pipes, and Docker. All existing CLI flags and
+subcommands work identically — zero breaking changes.
+
+### Fixed
+
+- **`cmdConvert` calling convention** — was calling `adapter.convert(flags)`
+  passing the flags object where the records array should go. Adapter signature
+  is `convert(records, opts)`. Fixed to `readJsonl(flags.from)` then
+  `adapter.convert(records, flags)`. Resolved `Cannot read properties of
+  undefined (reading 'separator')` on every convert invocation.
+- **`listConvertAdapters()` awaited unnecessarily** — function is synchronous
+  but was being called with `await`. Removed.
+- **`vex convert --from` missing guard** — calling convert without `--from` gave
+  a confusing crash. Now exits cleanly with usage message.
+- **`spawnSync` shell deprecation on Node 24** — TUI's internal `spawnSync` call
+  removed `shell: true` to suppress `[DEP0190]` deprecation warning.
+- **VERSION constant** — was hardcoded as `'0.8.5'` while `package.json` read
+  `0.8.6`. Corrected to match.
+
+### Testing
+
+Added `test_vex.py` — 53 tests across 10 sections:
+- Entry point, inspect, validate, adapters, convert (all 5 adapters)
+- Sign + verify including tamper detection
+- Export, import, migrate error handling
+- Sync subcommands
+- Module resolution for all 6 core modules
+
+Fixture writes use `encoding='utf-8', newline='\n'` (no BOM) and include
+`vex_version: "1.0.0"` so validate passes correctly on Windows.
+
+### Dependencies added
+```json
+"ink": "^5.0.0",
+"react": "^18.0.0",
+"ink-select-input": "^5.0.0",
+"ink-text-input": "^6.0.0"
+```
+
+Install before first use: `npm install ink react ink-select-input ink-text-input`
+
+---
 
 ## v0.8.5 (2026-06-12)
 
