@@ -1,6 +1,6 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.8.4",
+  "version": "0.8.6",
   "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory. Import Claude and ChatGPT conversations with LLM fact extraction. Migrate between Pinecone, Qdrant, Chroma, Weaviate, pgvector, Redis, Milvus, Neo4j, VEKTOR. Convert to OpenAI, Anthropic, Groq, Mistral formats.",
   "type": "module",
   "bin": {
@@ -84,7 +84,11 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "better-sqlite3": "^12.9.0"
+    "better-sqlite3": "^12.9.0",
+    "ink": "^7.0.6",
+    "ink-select-input": "^6.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.7"
   },
   "optionalDependencies": {
     "@noble/ed25519": "^2.3.0",
@@ -92,12 +96,12 @@
   },
   "peerDependencies": {
     "@langchain/core": ">=0.2.0",
-    "sqlite-vec": ">=0.1.0",
-    "vektor-slipstream": ">=1.6.0",
-    "redis": ">=4.0.0",
     "@zilliz/milvus2-sdk-node": ">=2.0.0",
     "neo4j-driver": ">=5.0.0",
-    "pg": ">=8.0.0"
+    "pg": ">=8.0.0",
+    "redis": ">=4.0.0",
+    "sqlite-vec": ">=0.1.0",
+    "vektor-slipstream": ">=1.6.0"
   },
   "peerDependenciesMeta": {
     "sqlite-vec": {
