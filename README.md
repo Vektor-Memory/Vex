@@ -305,7 +305,17 @@ npm install pg
 # LangChain integration
 npm install @langchain/core
 ```
+v0.8.6 (2026-06-15)
 
+Added: Interactive TUI — full arrow-key command palette
+
+Running vex with no arguments now launches an Ink-powered terminal UI instead
+of showing plain-text help. Each command has a guided wizard that builds the
+correct flags from step-by-step prompts.
+
+bashvex           # launches interactive TUI (real TTY only)
+vex --help    # plain-text help unchanged
+vex export --from vektor --output mem.vmig.jsonl   # direct CLI unchanged
 ---
 
 ## Related
