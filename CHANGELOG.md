@@ -1,5 +1,9 @@
 # VEX Changelog
 
+## v0.8.6 (2026-06-15)
+
+-Ink CLI improvements
+
 ## v0.8.5 (2026-06-12)
 
 ### New Feature: `vex sync` — Sovereign Hybrid Memory Backup
