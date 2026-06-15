@@ -1,6 +1,6 @@
 {
   "name": "@vektormemory/vex",
-  "version": "0.8.6",
+  "version": "0.8.8",
   "description": "Cross-standard vector DB migration tool — .vmig.jsonl interchange format for agent memory. Import Claude and ChatGPT conversations with LLM fact extraction. Migrate between Pinecone, Qdrant, Chroma, Weaviate, pgvector, Redis, Milvus, Neo4j, VEKTOR. Convert to OpenAI, Anthropic, Groq, Mistral formats.",
   "type": "module",
   "bin": {

@@ -41,7 +41,9 @@ const R  = s => p(_.red, s);
 const Y  = s => p(_.amber, s);
 const Co = s => p(_.cobalt, s);
 
-const VERSION = '0.8.6';
+import { createRequire } from 'module';
+const _require = createRequire(import.meta.url);
+const VERSION  = _require('./package.json').version;
 
 function banner() {
   console.log('');
@@ -266,21 +268,37 @@ async function launchTUI() {
     migrate: ({ onRun, onBack }) => {
       const [step, setStep]      = useState('from');
       const [fromStore, setFrom] = useState('');
+      const [dbPath, setDb]      = useState('');
       useInput((_, key) => { if (key.escape) step === 'from' ? onBack() : setStep('from'); });
 
       if (step === 'from') return h(Box, { flexDirection:'column' },
         h(Header, { cmd:'migrate' }),
         h(Text, { color:'cyan', marginLeft:2, marginBottom:1 }, 'Migrate FROM?'),
-        h(SelectInput, { items: STORES, onSelect: item => { setFrom(item.value); setStep('to'); }}),
+        h(SelectInput, { items: STORES, onSelect: item => {
+          setFrom(item.value);
+          setStep(item.value === 'vektor' ? 'db' : 'to');
+        }}),
         h(Footer, null)
+      );
+      if (step === 'db') return h(Box, { flexDirection:'column' },
+        h(Header, { cmd:'migrate' }),
+        h(Ask, { prompt:'Path to VEKTOR SQLite DB?',
+          placeholder:'e.g. D:/Vektor/slipstream-memory.db',
+          hint:'tip: set VEKTOR_DB env var to skip this in future',
+          onSubmit: v => { setDb(v); setStep('to'); },
+          onBack: () => setStep('from') })
       );
       return h(Box, { flexDirection:'column' },
         h(Header, { cmd:'migrate' }),
-        h(Text, { color:'gray', marginLeft:2, marginBottom:1 }, 'from: ' + fromStore),
+        h(Text, { color:'gray', marginLeft:2, marginBottom:1 }, 'from: ' + fromStore + (dbPath ? ' (' + dbPath + ')' : '')),
         h(Text, { color:'cyan', marginLeft:2 }, 'Migrate TO?'),
         h(Box, { marginTop:1 },
           h(SelectInput, { items: STORES.filter(s => s.value !== fromStore && !s.value.includes('export')),
-            onSelect: item => onRun(['--from', fromStore, '--to', item.value])
+            onSelect: item => {
+              const args = ['--from', fromStore, '--to', item.value];
+              if (dbPath) args.push('--db', dbPath);
+              onRun(args);
+            }
           })
         ),
         h(Footer, null)
@@ -409,7 +427,7 @@ async function launchTUI() {
       await new Promise(r => setTimeout(r, 80));
       const { default: child } = await import('child_process');
       child.spawnSync(process.execPath, [process.argv[1], selectedCmd, ...args],
-        { stdio:'inherit', shell: process.platform === 'win32' });
+        { stdio:'inherit', shell: false });
     };
 
     if (screen === 'palette') return h(Box, { flexDirection:'column', paddingTop:1 },
@@ -537,25 +555,28 @@ async function cmdVerify(file, flags) {
 }
 
 async function cmdExport(flags) {
+  if (!flags.from) { console.error(R('\n  \u2717  Usage: vex export --from <store> --output <file.vmig.jsonl> [--db <path>]') + '\n'); process.exit(1); }
+  if (!flags.output) { console.error(R('\n  \u2717  --output <file.vmig.jsonl> is required') + '\n'); process.exit(1); }
   const connector = await getConnector(flags.from, flags);
-  const meta      = await streamExport(connector, flags);
+  const count     = await streamExport(connector, flags, flags.output);
   banner();
   box('EXPORT COMPLETE');
   row(Si('source'),  W(flags.from));
-  row(Si('output'),  Sk(flags.output || meta.file));
-  row(Si('records'), G(String(meta.count)));
-  if (meta.namespaces?.length) row(Si('namespaces'), Gr(meta.namespaces.join(', ')));
+  row(Si('output'),  Sk(flags.output));
+  row(Si('records'), G(String(count)));
   boxEnd();
 }
 
 async function cmdImport(flags) {
+  if (!flags.from) { console.error(R('\n  \u2717  --from <file.vmig.jsonl> is required') + '\n'); process.exit(1); }
+  if (!flags.to)   { console.error(R('\n  \u2717  --to <store> is required') + '\n'); process.exit(1); }
   const connector = await getConnector(flags.to, flags);
-  const meta      = await streamImport(connector, flags);
+  const meta      = await streamImport(flags.from, connector, flags);
   banner();
   box('IMPORT COMPLETE');
   row(Si('source'),    Sk(flags.from));
   row(Si('target'),    W(flags.to));
-  row(Si('imported'),  G(String(meta.count)));
+  row(Si('imported'),  G(String(meta.upserted ?? meta.total ?? 0)));
   if (meta.skipped) row(Si('skipped'), Y(String(meta.skipped)));
   boxEnd();
 }

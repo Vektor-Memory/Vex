@@ -1,5 +1,19 @@
 # VEX Changelog
 
+## v0.8.8 (2026-06-15)
+
+### Fixed
+- `streamExport(connector, opts, outPath)` — `cmdExport` was calling with only two args, leaving `outPath` as `undefined`. `fs.renameSync(tmpPath, undefined)` crashed after extracting all records. Fixed to pass `flags.output` as the third positional argument.
+- `streamImport(filePath, connector, opts)` — `cmdImport` was calling `streamImport(connector, flags)` with args transposed. Corrected argument order.
+- `cmdExport` — added explicit guard: exits with usage message if `--from` or `--output` is missing, rather than crashing mid-export.
+- `migrate` wizard — when selecting `vektor` as the FROM store, now prompts for `--db` path before showing the TO picker. Previously passed no `--db` flag and crashed with "requires --db path or VEKTOR_DB env var".
+- `spawnSync` shell deprecation warning on Node 24 — removed `shell: true` from TUI internal dispatch.
+
+### Tested
+- Live end-to-end test (`test_vex_live.py`) against real VEKTOR DB (1,429 records): export, inspect, validate, all 4 convert adapters, sign/verify, `--limit` flag — 14/14 passing.
+
+---
+
 ## v0.8.6 (2026-06-15)
 
 ### Added: Interactive TUI — full arrow-key command palette
